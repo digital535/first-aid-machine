@@ -89,6 +89,7 @@ function speak(text){
   msg.lang = "mr-IN";
   msg.rate = 0.75;
   msg.pitch = 1.0;
+  msg.volume = 1.0;
   speechSynthesis.cancel();
   speechSynthesis.speak(msg);
 }
