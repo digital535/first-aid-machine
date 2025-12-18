@@ -1,72 +1,3 @@
-<!DOCTYPE html>
-<html lang="mr">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Automatic First-Aid Machine</title>
-
-<style>
-  body{
-    font-family: Arial, sans-serif;
-    text-align: center;
-    margin: 0;
-    padding: 10px;
-    min-height: 100vh;
-  }
-  h2{
-    font-size: 28px;
-  }
-  video{
-    width: 100%;
-    max-width: 360px;
-    height: 280px;
-    border: 2px solid #333;
-    border-radius: 10px;
-  }
-  button{
-    font-size: 18px;
-    padding: 12px;
-    margin-top: 15px;
-    border-radius: 8px;
-  }
-  #out{
-    font-size: 20px;
-    margin-top: 15px;
-  }
-  footer{
-    margin-top: 30px;
-    padding: 15px;
-    font-size: 14px;
-    background: #f2f2f2;
-    border-top: 2px solid #ccc;
-  }
-</style>
-
-</head>
-
-<body>
-
-<h2>🏥 Automatic First-Aid Machine</h2>
-
-<!-- CAMERA -->
-<video id="cam" autoplay playsinline></video>
-<p id="status" style="color:blue;font-weight:bold;font-size:18px;"></p>
-
-<!-- EMERGENCY BUTTON -->
-<button onclick="manualStart()"
- style="background:red;color:white;border:none;">
-🚨 Emergency / समस्या बोला
-</button>
-
-<p id="out" style="color:green;"></p>
-
-<p style="color:red;font-size:15px;">
-⚠️ हे फक्त प्राथमिक उपचारांसाठी आहे. गंभीर आजारासाठी डॉक्टरांचा सल्ला घ्या.
-</p>
-
-<p id="medStatus" style="color:purple;font-size:16px;"></p>
-<p id="log" style="font-size:13px;color:gray;"></p>
-
 <script>
 let step = 0;
 let disease="", medicine="", doseInfo="";
@@ -74,6 +5,7 @@ let recognition;
 let systemLocked = false;
 let lastMedicine = "";
 
+/* STOCK */
 let stock = {
   "पॅरासिटामॉल": 2,
   "पेनकिलर": 2,
@@ -84,16 +16,31 @@ let stock = {
   "कॉटन आणि अँटिसेप्टिक": 2
 };
 
+/* ========== SPEAK + DISPLAY (IMPORTANT FIX) ========== */
 function speak(text){
+  // DISPLAY what machine speaks
+  out.innerHTML += "<br><span style='color:#000;'>🤖 मशीन: " + text + "</span>";
+
   let msg = new SpeechSynthesisUtterance(text);
   msg.lang = "mr-IN";
-  msg.rate = 0.75;
+  msg.rate = 0.65;   // अजून slow
   msg.pitch = 1.0;
   msg.volume = 1.0;
+
+  // Try to select best Marathi voice
+  let voices = speechSynthesis.getVoices();
+  for(let v of voices){
+    if(v.lang === "mr-IN"){
+      msg.voice = v;
+      break;
+    }
+  }
+
   speechSynthesis.cancel();
   speechSynthesis.speak(msg);
 }
 
+/* GREETING */
 function greetUser(){
   let h = new Date().getHours();
   if(h < 12) speak("शुभ सकाळ.");
@@ -101,11 +48,13 @@ function greetUser(){
   else speak("शुभ संध्याकाळ.");
 }
 
+/* LOCK */
 function lockSystem(){
   systemLocked = true;
   setTimeout(()=>{ systemLocked = false; }, 30000);
 }
 
+/* RESET */
 function resetCountdown(){
   let c = 5;
   let i = setInterval(()=>{
@@ -118,6 +67,7 @@ function resetCountdown(){
   },1000);
 }
 
+/* LISTEN */
 function startListening(){
   if(systemLocked) return;
 
@@ -127,8 +77,9 @@ function startListening(){
 
   recognition.onresult = function(e){
     let text = e.results[0][0].transcript;
-    out.innerHTML = "🗣️ तुम्ही बोललात: " + text;
+    out.innerHTML += "<br><b>🗣️ तुम्ही:</b> " + text;
 
+    // DANGER
     if(text.includes("रक्त") || text.includes("बेशुद्ध") || text.includes("अपघात")){
       speak("हा गंभीर प्रकार आहे. तात्काळ डॉक्टरांकडे जा.");
       lockSystem();
@@ -136,34 +87,35 @@ function startListening(){
       return;
     }
 
+    // STEP 1
     if(step === 0){
       if(text.includes("ताप")){
         disease="ताप"; medicine="पॅरासिटामॉल";
-        doseInfo="६ ते ८ तासांनी, दिवसातून ३ वेळा, जेवणानंतर.सकाळी दुपारी संध्याकाळी ";
+        doseInfo="६ ते ८ तासांनी, दिवसातून ३ वेळा. सकाळी, दुपारी आणि संध्याकाळी जेवणानंतर.";
       }
       else if(text.includes("डोके")){
         disease="डोकेदुखी"; medicine="पेनकिलर";
-        doseInfo="दिवसातून २ वेळा, जेवणानंतर.सकाळी आणि संध्याकाळी ";
+        doseInfo="दिवसातून २ वेळा. सकाळी आणि संध्याकाळी जेवणानंतर.";
       }
       else if(text.includes("सर्दी")){
         disease="सर्दी"; medicine="कोल्ड टॅब्लेट";
-        doseInfo="दिवसातून २ वेळा, सकाळी आणि संध्याकाळी ";
+        doseInfo="दिवसातून २ वेळा. सकाळी आणि संध्याकाळी.";
       }
       else if(text.includes("खोकला")){
         disease="खोकला"; medicine="खोकल्याची गोळी";
-        doseInfo="जेवणानंत दिवसातून २–३ वेळा.सकाळी दुपारी संध्याकाळी ";
+        doseInfo="दिवसातून २ ते ३ वेळा. सकाळी, दुपारी आणि संध्याकाळी.";
       }
       else if(text.includes("पोट")){
         disease="पोटदुखी"; medicine="अँटॅसिड";
-        doseInfo="जेवणानंतर, दिवसातून २ वेळा.सकाळी आणि संध्याकाळी ";
+        doseInfo="जेवणानंतर दिवसातून २ वेळा. सकाळी आणि संध्याकाळी.";
       }
       else if(text.includes("जखम")){
         disease="जखम"; medicine="कॉटन आणि अँटिसेप्टिक";
-        doseInfo="आधी अँटिसेप्टिक, नंतर कॉटन.";
+        doseInfo="आधी अँटिसेप्टिक लावा, नंतर कॉटन वापरा.";
       }
       else if(text.includes("चक्कर")){
         disease="चक्कर"; medicine="ORS";
-        doseInfo="ORS १ लिटर पाणी मध्ये मिक्स करून  हळूहळू, दिवसातून २–३ वेळा.";
+        doseInfo="ORS एक लिटर पाण्यात मिसळून हळूहळू प्या. दिवसातून २ ते ३ वेळा.";
       }
       else{
         speak("डॉक्टरांचा सल्ला घ्या");
@@ -174,21 +126,33 @@ function startListening(){
       speak("तुला " + disease + " आहे का?");
       setTimeout(startListening, 4000);
     }
+
+    // STEP 2
     else if(step === 1){
       if(text.includes("हो")){
         if(medicine === lastMedicine || stock[medicine] <= 0){
           speak("हे औषध सध्या उपलब्ध नाही.");
           return;
         }
+
         stock[medicine]--;
         lastMedicine = medicine;
 
-        speak("मग " + medicine + " घ्या. " + doseInfo + " धन्यवाद. काळजी घ्या.");
-        out.innerHTML += "<br><b>💊 औषध:</b> " + medicine;
-        medStatus.innerText = "💊 औषध वितरित झाले";
+        speak(
+          "मग " + medicine + " घ्या. " +
+          "डोस असा आहे. " + doseInfo +
+          " धन्यवाद. स्वतःची काळजी घ्या."
+        );
+
+        out.innerHTML +=
+          "<br><b>🩺 आजार:</b> " + disease +
+          "<br><b>💊 औषध:</b> " + medicine +
+          "<br><b>📋 कधी आणि कसं घ्यायचं:</b> " + doseInfo;
+
         lockSystem();
         resetCountdown();
-      } else {
+      }
+      else{
         speak("डॉक्टरांचा सल्ला घ्या");
         resetCountdown();
       }
@@ -196,6 +160,7 @@ function startListening(){
   };
 }
 
+/* CAMERA AUTO START */
 navigator.mediaDevices.getUserMedia({ video:true })
 .then(stream=>{
   cam.srcObject = stream;
@@ -205,6 +170,7 @@ navigator.mediaDevices.getUserMedia({ video:true })
   setTimeout(startListening, 4000);
 });
 
+/* EMERGENCY */
 function manualStart(){
   if(systemLocked) return;
   speak("कृपया तुमची समस्या सांगा");
@@ -212,18 +178,3 @@ function manualStart(){
   setTimeout(startListening, 3000);
 }
 </script>
-
-<!-- FOOTER / TAGLINE -->
-<footer>
-<b>Concept Developed By</b><br>
-Archana Avhad<br>
-Sakshi Bagade<br>
-Snehal Raut<br>
-Snehal Jadhav<br>
-Gauri Khilari<br>
-Vaishnavi Jadhav<br><br>
-<i>वरील विद्यार्थिनींनी ही संकल्पना विकसित केली आहे.</i>
-</footer>
-
-</body>
-</html>
