@@ -15,8 +15,6 @@ body{
   flex-direction:column;
   align-items:center;
 }
-
-/* HEADER */
 header{
   width:100%;
   padding:15px;
@@ -26,8 +24,6 @@ header{
   font-weight:bold;
   text-align:center;
 }
-
-/* CARD */
 .card{
   background:white;
   width:95%;
@@ -37,8 +33,6 @@ header{
   border-radius:20px;
   box-shadow:0 10px 25px rgba(0,0,0,0.15);
 }
-
-/* CAMERA */
 video{
   width:100%;
   height:260px;
@@ -46,27 +40,21 @@ video{
   border:3px solid #0d6efd;
   background:black;
 }
-
-/* STATUS */
 #status{
   margin-top:10px;
   font-size:17px;
   font-weight:bold;
   color:#0d6efd;
 }
-
-/* OUTPUT / CHAT */
 #out{
   margin-top:15px;
   padding:12px;
   background:#f8f9fa;
   border-radius:10px;
-  min-height:100px;
+  min-height:120px;
   font-size:16px;
   text-align:left;
 }
-
-/* EMERGENCY BUTTON */
 .emergency{
   width:100%;
   margin-top:18px;
@@ -80,19 +68,12 @@ video{
   cursor:pointer;
   box-shadow:0 0 15px rgba(220,53,69,0.7);
 }
-.emergency:active{
-  transform:scale(0.97);
-}
-
-/* WARNING */
 .warning{
   margin-top:12px;
   font-size:14px;
   color:#b02a37;
   font-weight:bold;
 }
-
-/* FOOTER */
 footer{
   margin-top:auto;
   width:100%;
@@ -110,15 +91,11 @@ footer{
 <header>🏥 Automatic First-Aid Machine</header>
 
 <div class="card">
-
-  <!-- CAMERA -->
-  <video id="cam" autoplay playsinline></video>
+  <video id="cam" autoplay muted playsinline></video>
   <div id="status">📷 Camera सुरू आहे</div>
 
-  <!-- OUTPUT -->
   <div id="out">🤖 मशीन तयार आहे...</div>
 
-  <!-- EMERGENCY -->
   <button class="emergency" onclick="manualStart()">
     🚨 Emergency / समस्या बोला
   </button>
@@ -126,37 +103,29 @@ footer{
   <div class="warning">
     ⚠️ हे फक्त प्राथमिक उपचारांसाठी आहे. गंभीर आजारासाठी डॉक्टरांचा सल्ला घ्या.
   </div>
-
 </div>
 
 <footer>
 <b>Concept Developed By</b><br>
-Archana Avhad · Sakshi Bagade · Snehal Raut · Snehal Jadhav · Gauri Khilari · Vaishnavi Jadhav<br><br>
+Archana Avhad · Sakshi Bagade · Snehal Raut · Snehal Jadhav ·  
+Gauri Khilari · Vaishnavi Jadhav<br><br>
 <i>वरील विद्यार्थिनींनी ही संकल्पना विकसित केली आहे.</i>
 </footer>
 
 <script>
 /* ================= GLOBAL VARIABLES ================= */
 let step = 0;
-let disease = "", medicine = "", doseInfo = "";
+let disease="", medicine="", doseInfo="";
 let recognition;
 
 /* ================= SPEAK + DISPLAY ================= */
 function speak(text){
-  out.innerHTML += "<br>🤖 <b>" + text + "</b>";
+  out.innerHTML += "<br>🤖 <b>"+text+"</b>";
   let msg = new SpeechSynthesisUtterance(text);
   msg.lang = "mr-IN";
   msg.rate = 0.65;
   speechSynthesis.cancel();
   speechSynthesis.speak(msg);
-}
-
-/* ================= GREETING ================= */
-function greetUser(){
-  let h = new Date().getHours();
-  if(h < 12) speak("शुभ सकाळ.");
-  else if(h < 18) speak("नमस्कार.");
-  else speak("शुभ संध्याकाळ.");
 }
 
 /* ================= START LISTENING ================= */
@@ -169,13 +138,7 @@ function startListening(){
     let text = e.results[0][0].transcript;
     out.innerHTML += "<br>🗣️ " + text;
 
-    /* DANGER WORDS */
-    if(text.includes("रक्त") || text.includes("अपघात") || text.includes("बेशुद्ध")){
-      speak("हा गंभीर प्रकार आहे. तात्काळ डॉक्टरांकडे जा.");
-      return;
-    }
-
-    /* ================= STEP 1 : DISEASE DETECTION ================= */
+    /* -------- STEP 1 : Disease Detection -------- */
     if(step === 0){
 
       if(text.includes("ताप")){
@@ -220,44 +183,59 @@ function startListening(){
 
       step = 1;
       speak("तुला " + disease + " आहे का?");
-      setTimeout(startListening, 3500);
+      setTimeout(startListening, 3000);
     }
 
-    /* ================= STEP 2 : CONFIRMATION ================= */
+    /* -------- STEP 2 : Confirmation -------- */
     else if(step === 1){
+
       if(text.includes("हो")){
-        speak("मग " + medicine + " घ्या.");
-        speak("डोस असा आहे. " + doseInfo);
+        speak(
+          "औषधाचे नाव आहे " + medicine +
+          ". हे औषध घ्यायचा डोस असा आहे. " +
+          doseInfo +
+          " धन्यवाद. स्वतःची काळजी घ्या."
+        );
 
-        out.innerHTML +=
-          "<br><b>🩺 आजार:</b> " + disease +
-          "<br><b>💊 औषध:</b> " + medicine +
-          "<br><b>📋 कधी आणि कसं घ्यायचं:</b> " + doseInfo;
+        out.innerHTML += `
+          <hr>
+          <div style="background:#e8f5e9;padding:12px;border-radius:10px;">
+            <b>🩺 आजार:</b> ${disease}<br><br>
+            <b>💊 औषध:</b> ${medicine}<br><br>
+            <b>📋 कधी आणि कसं घ्यायचं:</b><br>
+            ${doseInfo}
+          </div>
+          <hr>
+        `;
 
-        speak("धन्यवाद. स्वतःची काळजी घ्या.");
+        setTimeout(()=>location.reload(), 6000);
       }
       else{
         speak("डॉक्टरांचा सल्ला घ्या.");
+        setTimeout(()=>location.reload(), 6000);
       }
+
       step = 0;
     }
   };
 }
 
 /* ================= CAMERA AUTO START ================= */
-navigator.mediaDevices.getUserMedia({ video:true })
+navigator.mediaDevices.getUserMedia({ video:true, audio:false })
 .then(stream=>{
   cam.srcObject = stream;
   status.innerText = "👤 व्यक्ती ओळखली गेली आहे";
-  greetUser();
   speak("तुला काय त्रास होतोय?");
-  setTimeout(startListening, 3500);
+  setTimeout(startListening, 3000);
+})
+.catch(()=>{
+  status.innerText = "❌ Camera permission नाकारली आहे";
 });
 
 /* ================= EMERGENCY BUTTON ================= */
 function manualStart(){
-  speak("कृपया तुमची समस्या सांगा");
   step = 0;
+  speak("कृपया तुमची समस्या सांगा");
   setTimeout(startListening, 2500);
 }
 </script>
