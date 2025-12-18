@@ -13,8 +13,10 @@
 <video id="cam" width="320" height="240" autoplay playsinline></video>
 <p id="status" style="color:blue;font-weight:bold;"></p>
 
-<button onclick="startConversation()" style="font-size:16px;">
-  🎤 समस्या बोला
+<!-- EMERGENCY BUTTON -->
+<button onclick="manualStart()" 
+        style="font-size:16px;background:red;color:white;padding:10px;border:none;">
+🚨 Emergency / समस्या बोला
 </button>
 
 <p id="out" style="font-size:18px;color:green;"></p>
@@ -23,54 +25,66 @@
 let step = 0;
 let disease = "";
 let medicine = "";
+let doseInfo = "";
+let recognition;
 
-/* Machine Speak (Marathi) */
+/* SPEAK FUNCTION – Slow Marathi */
 function speak(text){
   let msg = new SpeechSynthesisUtterance(text);
   msg.lang = "mr-IN";
+  msg.rate = 0.75;
+  msg.pitch = 1.0;
+  msg.volume = 1.0;
+  speechSynthesis.cancel();
   speechSynthesis.speak(msg);
 }
 
-/* Camera ON */
-navigator.mediaDevices.getUserMedia({ video:true })
-.then(stream=>{
-  cam.srcObject = stream;
-  status.innerText = "👤 व्यक्ती मशीनसमोर ओळखली गेली आहे";
-  speak("तुला काय त्रास होतोय?");
-});
+/* START MIC */
+function startListening(){
+  recognition = new webkitSpeechRecognition();
+  recognition.lang = "mr-IN";
+  recognition.start();
 
-/* Start Conversation */
-function startConversation(){
-  let r = new webkitSpeechRecognition();
-  r.lang = "mr-IN";
-  r.start();
-
-  r.onresult = function(e){
+  recognition.onresult = function(e){
     let text = e.results[0][0].transcript;
-    out.innerHTML = "तू बोललास: " + text;
+    out.innerHTML = "🗣️ तुम्ही बोललात: " + text;
 
-    /* STEP 1: Detect Disease */
+    /* STEP 1 – Disease Detection */
     if(step === 0){
       if(text.includes("ताप")){
-        disease="ताप"; medicine="पॅरासिटामॉल";
+        disease="ताप";
+        medicine="पॅरासिटामॉल";
+        doseInfo="६ ते ८ तासांनी घ्या. दिवसातून जास्तीत जास्त ३ वेळा. जेवणानंतर सकाळी दुपारी संध्याकाळ घ्या.";
       }
       else if(text.includes("डोके")){
-        disease="डोकेदुखी"; medicine="पेनकिलर";
+        disease="डोकेदुखी";
+        medicine="पेनकिलर";
+        doseInfo="दिवसातून २ वेळा. जेवणानंतर घ्या.सकाळी आणि संध्याकाळ";
       }
       else if(text.includes("सर्दी")){
-        disease="सर्दी"; medicine="कोल्ड टॅब्लेट";
+        disease="सर्दी";
+        medicine="कोल्ड टॅब्लेट";
+        doseInfo="दिवसातून २ वेळा. गरम पाण्यासोबत घ्या.सकाळी आणि संध्याकाळ";
       }
       else if(text.includes("खोकला")){
-        disease="खोकला"; medicine="कफ टॅब्लेट";
+        disease="खोकला";
+        medicine="खोकल्याची गोळी";
+        doseInfo="दिवसातून २ ते ३ वेळा. पाण्यासोबत घ्या.सकाळी आणि संध्याकाळ";
       }
       else if(text.includes("पोट")){
-        disease="पोटदुखी"; medicine="अँटॅसिड";
+        disease="पोटदुखी";
+        medicine="अँटॅसिड";
+        doseInfo="जेवणानंतर घ्या. दिवसातून २ वेळा. सकाळी आणि संध्याकाळी";
       }
       else if(text.includes("जखम")){
-        disease="जखम"; medicine="कॉटन आणि अँटिसेप्टिक";
+        disease="जखम";
+        medicine="कॉटन आणि अँटिसेप्टिक";
+        doseInfo="आधी अँटिसेप्टिक लावा, मग कॉटन वापरा.";
       }
       else if(text.includes("चक्कर")){
-        disease="चक्कर"; medicine="ORS";
+        disease="चक्कर";
+        medicine="ORS";
+        doseInfo="ORS १ लिटर पाणी मिसळून हळूहळू प्या. दिवसातून २ ते ३ वेळा.";
       }
       else{
         speak("डॉक्टरांचा सल्ला घ्या");
@@ -79,16 +93,18 @@ function startConversation(){
 
       step = 1;
       speak("तुला " + disease + " आहे का?");
+      setTimeout(startListening, 4000);
     }
 
-    /* STEP 2: Confirmation */
+    /* STEP 2 – Confirmation */
     else if(step === 1){
       if(text.includes("हो")){
-        speak("मग " + medicine + " घ्या");
+        speak("मग " + medicine + " घ्या. " + doseInfo);
         out.innerHTML +=
-          "<br>🩺 आजार: " + disease +
-          "<br>💊 औषध: " + medicine;
-        step = 0; // reset
+          "<br><b>🩺 आजार:</b> " + disease +
+          "<br><b>💊 औषध:</b> " + medicine +
+          "<br><b>📋 डोस:</b> " + doseInfo;
+        step = 0;
       }
       else{
         speak("डॉक्टरांचा सल्ला घ्या");
@@ -96,6 +112,23 @@ function startConversation(){
       }
     }
   };
+}
+
+/* AUTO START WHEN CAMERA ON */
+navigator.mediaDevices.getUserMedia({ video:true })
+.then(stream=>{
+  cam.srcObject = stream;
+  status.innerText = "👤 व्यक्ती ओळखली गेली आहे (Auto Mode)";
+  speak("तुला काय त्रास होतोय?");
+  setTimeout(startListening, 4000);
+});
+
+/* EMERGENCY MANUAL BUTTON */
+function manualStart(){
+  status.innerText = "🚨 Emergency Mode सुरू";
+  speak("कृपया तुमची समस्या सांगा");
+  step = 0;
+  setTimeout(startListening, 3000);
 }
 </script>
 
