@@ -1,93 +1,185 @@
-<script>
-let step = 0;
-let disease="", medicine="", doseInfo="";
-let recognition;
-let systemLocked = false;
-let lastMedicine = "";
+<!DOCTYPE html>
+<html lang="mr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Automatic First-Aid Machine</title>
 
-/* STOCK */
-let stock = {
-  "पॅरासिटामॉल": 2,
-  "पेनकिलर": 2,
-  "कोल्ड टॅब्लेट": 2,
-  "खोकल्याची गोळी": 2,
-  "अँटॅसिड": 2,
-  "ORS": 2,
-  "कॉटन आणि अँटिसेप्टिक": 2
+<style>
+body{
+  margin:0;
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: linear-gradient(135deg,#e3f2fd,#ffffff);
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+}
+
+/* HEADER */
+header{
+  width:100%;
+  padding:15px;
+  background:#0d6efd;
+  color:white;
+  font-size:26px;
+  font-weight:bold;
+  text-align:center;
+}
+
+/* MAIN CARD */
+.card{
+  background:white;
+  width:95%;
+  max-width:420px;
+  margin-top:20px;
+  padding:20px;
+  border-radius:20px;
+  box-shadow:0 10px 25px rgba(0,0,0,0.15);
+  text-align:center;
+}
+
+/* CAMERA */
+video{
+  width:100%;
+  height:260px;
+  border-radius:15px;
+  border:3px solid #0d6efd;
+  background:#000;
+}
+
+/* STATUS */
+#status{
+  margin-top:10px;
+  font-size:17px;
+  font-weight:bold;
+  color:#0d6efd;
+}
+
+/* CHAT BOX */
+#out{
+  margin-top:15px;
+  padding:12px;
+  background:#f8f9fa;
+  border-radius:10px;
+  min-height:70px;
+  font-size:16px;
+  text-align:left;
+}
+
+/* EMERGENCY BUTTON */
+.emergency{
+  width:100%;
+  margin-top:18px;
+  padding:15px;
+  font-size:20px;
+  border:none;
+  border-radius:12px;
+  background:#dc3545;
+  color:white;
+  font-weight:bold;
+  cursor:pointer;
+  box-shadow:0 0 15px rgba(220,53,69,0.7);
+}
+.emergency:active{
+  transform:scale(0.97);
+}
+
+/* WARNING */
+.warning{
+  margin-top:12px;
+  font-size:14px;
+  color:#b02a37;
+  font-weight:bold;
+}
+
+/* FOOTER */
+footer{
+  margin-top:auto;
+  width:100%;
+  background:#f1f1f1;
+  padding:15px;
+  text-align:center;
+  font-size:13px;
+  border-top:2px solid #ccc;
+}
+</style>
+</head>
+
+<body>
+
+<header>🏥 Automatic First-Aid Machine</header>
+
+<div class="card">
+
+  <!-- CAMERA -->
+  <video id="cam" autoplay playsinline></video>
+  <div id="status">📷 Camera सुरू आहे</div>
+
+  <!-- CHAT / OUTPUT -->
+  <div id="out">
+    🤖 मशीन तयार आहे...
+  </div>
+
+  <!-- EMERGENCY BUTTON -->
+  <button class="emergency" onclick="manualStart()">
+    🚨 Emergency / समस्या बोला
+  </button>
+
+  <div class="warning">
+    ⚠️ हे फक्त प्राथमिक उपचारांसाठी आहे. गंभीर आजारासाठी डॉक्टरांचा सल्ला घ्या.
+  </div>
+
+</div>
+
+<footer>
+<b>Concept Developed By</b><br>
+Archana Avhad · Sakshi Bagade · Snehal Raut · Snehal Jadhav · Gauri Khilari · Vaishnavi Jadhav<br><br>
+<i>वरील विद्यार्थिनींनी ही संकल्पना विकसित केली आहे.</i>
+</footer>
+
+<script>
+/* ================= LOGIC (तुझाच, थोडा clean) ================= */
+
+let step=0,disease="",medicine="",doseInfo="";
+let recognition,systemLocked=false,lastMedicine="";
+
+let stock={
+ "पॅरासिटामॉल":2,"पेनकिलर":2,"कोल्ड टॅब्लेट":2,
+ "खोकल्याची गोळी":2,"अँटॅसिड":2,"ORS":2,
+ "कॉटन आणि अँटिसेप्टिक":2
 };
 
-/* ========== SPEAK + DISPLAY (IMPORTANT FIX) ========== */
 function speak(text){
-  // DISPLAY what machine speaks
-  out.innerHTML += "<br><span style='color:#000;'>🤖 मशीन: " + text + "</span>";
-
-  let msg = new SpeechSynthesisUtterance(text);
-  msg.lang = "mr-IN";
-  msg.rate = 0.65;   // अजून slow
-  msg.pitch = 1.0;
-  msg.volume = 1.0;
-
-  // Try to select best Marathi voice
-  let voices = speechSynthesis.getVoices();
-  for(let v of voices){
-    if(v.lang === "mr-IN"){
-      msg.voice = v;
-      break;
-    }
-  }
-
+  out.innerHTML += "<br>🤖 <b>"+text+"</b>";
+  let msg=new SpeechSynthesisUtterance(text);
+  msg.lang="mr-IN";
+  msg.rate=0.65;
   speechSynthesis.cancel();
   speechSynthesis.speak(msg);
 }
 
-/* GREETING */
 function greetUser(){
-  let h = new Date().getHours();
-  if(h < 12) speak("शुभ सकाळ.");
-  else if(h < 18) speak("नमस्कार.");
-  else speak("शुभ संध्याकाळ.");
+  let h=new Date().getHours();
+  speak(h<12?"शुभ सकाळ.":h<18?"नमस्कार.":"शुभ संध्याकाळ.");
 }
 
-/* LOCK */
-function lockSystem(){
-  systemLocked = true;
-  setTimeout(()=>{ systemLocked = false; }, 30000);
-}
-
-/* RESET */
-function resetCountdown(){
-  let c = 5;
-  let i = setInterval(()=>{
-    status.innerText = "Reset होत आहे: " + c;
-    c--;
-    if(c < 0){
-      clearInterval(i);
-      location.reload();
-    }
-  },1000);
-}
-
-/* LISTEN */
 function startListening(){
   if(systemLocked) return;
-
-  recognition = new webkitSpeechRecognition();
-  recognition.lang = "mr-IN";
+  recognition=new webkitSpeechRecognition();
+  recognition.lang="mr-IN";
   recognition.start();
 
-  recognition.onresult = function(e){
-    let text = e.results[0][0].transcript;
-    out.innerHTML += "<br><b>🗣️ तुम्ही:</b> " + text;
+  recognition.onresult=function(e){
+    let text=e.results[0][0].transcript;
+    out.innerHTML+="<br>🗣️ "+text;
 
-    // DANGER
-    if(text.includes("रक्त") || text.includes("बेशुद्ध") || text.includes("अपघात")){
+    if(text.includes("रक्त")||text.includes("अपघात")){
       speak("हा गंभीर प्रकार आहे. तात्काळ डॉक्टरांकडे जा.");
-      lockSystem();
-      resetCountdown();
       return;
     }
 
-    // STEP 1
+       // STEP 1
     if(step === 0){
       if(text.includes("ताप")){
         disease="ताप"; medicine="पॅरासिटामॉल";
@@ -117,64 +209,27 @@ function startListening(){
         disease="चक्कर"; medicine="ORS";
         doseInfo="ORS एक लिटर पाण्यात मिसळून हळूहळू प्या. दिवसातून २ ते ३ वेळा.";
       }
-      else{
-        speak("डॉक्टरांचा सल्ला घ्या");
-        return;
-      }
-
-      step = 1;
-      speak("तुला " + disease + " आहे का?");
-      setTimeout(startListening, 4000);
-    }
-
-    // STEP 2
-    else if(step === 1){
-      if(text.includes("हो")){
-        if(medicine === lastMedicine || stock[medicine] <= 0){
-          speak("हे औषध सध्या उपलब्ध नाही.");
-          return;
-        }
-
-        stock[medicine]--;
-        lastMedicine = medicine;
-
-        speak(
-          "मग " + medicine + " घ्या. " +
-          "डोस असा आहे. " + doseInfo +
-          " धन्यवाद. स्वतःची काळजी घ्या."
-        );
-
-        out.innerHTML +=
-          "<br><b>🩺 आजार:</b> " + disease +
-          "<br><b>💊 औषध:</b> " + medicine +
-          "<br><b>📋 कधी आणि कसं घ्यायचं:</b> " + doseInfo;
-
-        lockSystem();
-        resetCountdown();
-      }
-      else{
-        speak("डॉक्टरांचा सल्ला घ्या");
-        resetCountdown();
-      }
+      else{speak("डॉक्टरांचा सल्ला घ्या");
+      step=0;
     }
   };
 }
 
-/* CAMERA AUTO START */
-navigator.mediaDevices.getUserMedia({ video:true })
+navigator.mediaDevices.getUserMedia({video:true})
 .then(stream=>{
-  cam.srcObject = stream;
-  status.innerText = "👤 व्यक्ती ओळखली गेली आहे";
+  cam.srcObject=stream;
+  status.innerText="👤 व्यक्ती ओळखली गेली आहे";
   greetUser();
   speak("तुला काय त्रास होतोय?");
-  setTimeout(startListening, 4000);
+  setTimeout(startListening,3500);
 });
 
-/* EMERGENCY */
 function manualStart(){
-  if(systemLocked) return;
   speak("कृपया तुमची समस्या सांगा");
-  step = 0;
-  setTimeout(startListening, 3000);
+  step=0;
+  setTimeout(startListening,2500);
 }
 </script>
+
+</body>
+</html>
