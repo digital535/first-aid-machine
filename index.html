@@ -14,31 +14,32 @@
 <p id="status" style="color:blue;font-weight:bold;"></p>
 
 <button onclick="startConversation()" style="font-size:16px;">
-  🎤 बोलायला सुरुवात करा
+  🎤 समस्या बोला
 </button>
 
 <p id="out" style="font-size:18px;color:green;"></p>
 
 <script>
 let step = 0;
-let detectedDisease = "";
+let disease = "";
+let medicine = "";
 
-/* SPEAK FUNCTION (Marathi Voice) */
+/* Machine Speak (Marathi) */
 function speak(text){
   let msg = new SpeechSynthesisUtterance(text);
   msg.lang = "mr-IN";
-  window.speechSynthesis.speak(msg);
+  speechSynthesis.speak(msg);
 }
 
-/* CAMERA ON */
+/* Camera ON */
 navigator.mediaDevices.getUserMedia({ video:true })
 .then(stream=>{
   cam.srcObject = stream;
-  status.innerText = "👤 व्यक्ती ओळखली गेली आहे";
+  status.innerText = "👤 व्यक्ती मशीनसमोर ओळखली गेली आहे";
   speak("तुला काय त्रास होतोय?");
 });
 
-/* START VOICE CONVERSATION */
+/* Start Conversation */
 function startConversation(){
   let r = new webkitSpeechRecognition();
   r.lang = "mr-IN";
@@ -48,27 +49,50 @@ function startConversation(){
     let text = e.results[0][0].transcript;
     out.innerHTML = "तू बोललास: " + text;
 
-    /* STEP 1 – Disease Detection */
+    /* STEP 1: Detect Disease */
     if(step === 0){
       if(text.includes("ताप")){
-        detectedDisease = "ताप";
-        step = 1;
-        speak("तुला ताप येतोय का?");
+        disease="ताप"; medicine="पॅरासिटामॉल";
+      }
+      else if(text.includes("डोके")){
+        disease="डोकेदुखी"; medicine="पेनकिलर";
+      }
+      else if(text.includes("सर्दी")){
+        disease="सर्दी"; medicine="कोल्ड टॅब्लेट";
+      }
+      else if(text.includes("खोकला")){
+        disease="खोकला"; medicine="कफ टॅब्लेट";
+      }
+      else if(text.includes("पोट")){
+        disease="पोटदुखी"; medicine="अँटॅसिड";
+      }
+      else if(text.includes("जखम")){
+        disease="जखम"; medicine="कॉटन आणि अँटिसेप्टिक";
+      }
+      else if(text.includes("चक्कर")){
+        disease="चक्कर"; medicine="ORS";
       }
       else{
         speak("डॉक्टरांचा सल्ला घ्या");
+        return;
       }
+
+      step = 1;
+      speak("तुला " + disease + " आहे का?");
     }
 
-    /* STEP 2 – Confirmation */
+    /* STEP 2: Confirmation */
     else if(step === 1){
       if(text.includes("हो")){
-        step = 2;
-        speak("मग पॅरासिटामॉलची गोळी घ्या");
-        out.innerHTML += "<br>💊 औषध: पॅरासिटामॉल";
+        speak("मग " + medicine + " घ्या");
+        out.innerHTML +=
+          "<br>🩺 आजार: " + disease +
+          "<br>💊 औषध: " + medicine;
+        step = 0; // reset
       }
       else{
         speak("डॉक्टरांचा सल्ला घ्या");
+        step = 0;
       }
     }
   };
@@ -77,4 +101,3 @@ function startConversation(){
 
 </body>
 </html>
-s
