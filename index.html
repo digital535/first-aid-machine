@@ -8,8 +8,8 @@
 <style>
 body{
   margin:0;
-  font-family: "Segoe UI", Arial, sans-serif;
-  background: linear-gradient(135deg,#e3f2fd,#ffffff);
+  font-family:"Segoe UI",Arial,sans-serif;
+  background:linear-gradient(135deg,#e3f2fd,#ffffff);
   min-height:100vh;
   display:flex;
   flex-direction:column;
@@ -27,7 +27,7 @@ header{
   text-align:center;
 }
 
-/* MAIN CARD */
+/* CARD */
 .card{
   background:white;
   width:95%;
@@ -36,7 +36,6 @@ header{
   padding:20px;
   border-radius:20px;
   box-shadow:0 10px 25px rgba(0,0,0,0.15);
-  text-align:center;
 }
 
 /* CAMERA */
@@ -45,7 +44,7 @@ video{
   height:260px;
   border-radius:15px;
   border:3px solid #0d6efd;
-  background:#000;
+  background:black;
 }
 
 /* STATUS */
@@ -56,13 +55,13 @@ video{
   color:#0d6efd;
 }
 
-/* CHAT BOX */
+/* OUTPUT / CHAT */
 #out{
   margin-top:15px;
   padding:12px;
   background:#f8f9fa;
   border-radius:10px;
-  min-height:70px;
+  min-height:100px;
   font-size:16px;
   text-align:left;
 }
@@ -116,12 +115,10 @@ footer{
   <video id="cam" autoplay playsinline></video>
   <div id="status">📷 Camera सुरू आहे</div>
 
-  <!-- CHAT / OUTPUT -->
-  <div id="out">
-    🤖 मशीन तयार आहे...
-  </div>
+  <!-- OUTPUT -->
+  <div id="out">🤖 मशीन तयार आहे...</div>
 
-  <!-- EMERGENCY BUTTON -->
+  <!-- EMERGENCY -->
   <button class="emergency" onclick="manualStart()">
     🚨 Emergency / समस्या बोला
   </button>
@@ -139,95 +136,129 @@ Archana Avhad · Sakshi Bagade · Snehal Raut · Snehal Jadhav · Gauri Khilari 
 </footer>
 
 <script>
-/* ================= LOGIC (तुझाच, थोडा clean) ================= */
+/* ================= GLOBAL VARIABLES ================= */
+let step = 0;
+let disease = "", medicine = "", doseInfo = "";
+let recognition;
 
-let step=0,disease="",medicine="",doseInfo="";
-let recognition,systemLocked=false,lastMedicine="";
-
-let stock={
- "पॅरासिटामॉल":2,"पेनकिलर":2,"कोल्ड टॅब्लेट":2,
- "खोकल्याची गोळी":2,"अँटॅसिड":2,"ORS":2,
- "कॉटन आणि अँटिसेप्टिक":2
-};
-
+/* ================= SPEAK + DISPLAY ================= */
 function speak(text){
-  out.innerHTML += "<br>🤖 <b>"+text+"</b>";
-  let msg=new SpeechSynthesisUtterance(text);
-  msg.lang="mr-IN";
-  msg.rate=0.65;
+  out.innerHTML += "<br>🤖 <b>" + text + "</b>";
+  let msg = new SpeechSynthesisUtterance(text);
+  msg.lang = "mr-IN";
+  msg.rate = 0.65;
   speechSynthesis.cancel();
   speechSynthesis.speak(msg);
 }
 
+/* ================= GREETING ================= */
 function greetUser(){
-  let h=new Date().getHours();
-  speak(h<12?"शुभ सकाळ.":h<18?"नमस्कार.":"शुभ संध्याकाळ.");
+  let h = new Date().getHours();
+  if(h < 12) speak("शुभ सकाळ.");
+  else if(h < 18) speak("नमस्कार.");
+  else speak("शुभ संध्याकाळ.");
 }
 
+/* ================= START LISTENING ================= */
 function startListening(){
-  if(systemLocked) return;
-  recognition=new webkitSpeechRecognition();
-  recognition.lang="mr-IN";
+  recognition = new webkitSpeechRecognition();
+  recognition.lang = "mr-IN";
   recognition.start();
 
-  recognition.onresult=function(e){
-    let text=e.results[0][0].transcript;
-    out.innerHTML+="<br>🗣️ "+text;
+  recognition.onresult = function(e){
+    let text = e.results[0][0].transcript;
+    out.innerHTML += "<br>🗣️ " + text;
 
-    if(text.includes("रक्त")||text.includes("अपघात")){
+    /* DANGER WORDS */
+    if(text.includes("रक्त") || text.includes("अपघात") || text.includes("बेशुद्ध")){
       speak("हा गंभीर प्रकार आहे. तात्काळ डॉक्टरांकडे जा.");
       return;
     }
 
-       // STEP 1
+    /* ================= STEP 1 : DISEASE DETECTION ================= */
     if(step === 0){
+
       if(text.includes("ताप")){
-        disease="ताप"; medicine="पॅरासिटामॉल";
+        disease="ताप";
+        medicine="पॅरासिटामॉल";
         doseInfo="६ ते ८ तासांनी, दिवसातून ३ वेळा. सकाळी, दुपारी आणि संध्याकाळी जेवणानंतर.";
       }
       else if(text.includes("डोके")){
-        disease="डोकेदुखी"; medicine="पेनकिलर";
+        disease="डोकेदुखी";
+        medicine="पेनकिलर";
         doseInfo="दिवसातून २ वेळा. सकाळी आणि संध्याकाळी जेवणानंतर.";
       }
       else if(text.includes("सर्दी")){
-        disease="सर्दी"; medicine="कोल्ड टॅब्लेट";
+        disease="सर्दी";
+        medicine="कोल्ड टॅब्लेट";
         doseInfo="दिवसातून २ वेळा. सकाळी आणि संध्याकाळी.";
       }
       else if(text.includes("खोकला")){
-        disease="खोकला"; medicine="खोकल्याची गोळी";
+        disease="खोकला";
+        medicine="खोकल्याची गोळी";
         doseInfo="दिवसातून २ ते ३ वेळा. सकाळी, दुपारी आणि संध्याकाळी.";
       }
       else if(text.includes("पोट")){
-        disease="पोटदुखी"; medicine="अँटॅसिड";
+        disease="पोटदुखी";
+        medicine="अँटॅसिड";
         doseInfo="जेवणानंतर दिवसातून २ वेळा. सकाळी आणि संध्याकाळी.";
       }
       else if(text.includes("जखम")){
-        disease="जखम"; medicine="कॉटन आणि अँटिसेप्टिक";
+        disease="जखम";
+        medicine="कॉटन आणि अँटिसेप्टिक";
         doseInfo="आधी अँटिसेप्टिक लावा, नंतर कॉटन वापरा.";
       }
       else if(text.includes("चक्कर")){
-        disease="चक्कर"; medicine="ORS";
+        disease="चक्कर";
+        medicine="ORS";
         doseInfo="ORS एक लिटर पाण्यात मिसळून हळूहळू प्या. दिवसातून २ ते ३ वेळा.";
       }
-      else{speak("डॉक्टरांचा सल्ला घ्या");
-      step=0;
+      else{
+        speak("लक्षणे स्पष्ट नाहीत. कृपया डॉक्टरांचा सल्ला घ्या.");
+        return;
+      }
+
+      step = 1;
+      speak("तुला " + disease + " आहे का?");
+      setTimeout(startListening, 3500);
+    }
+
+    /* ================= STEP 2 : CONFIRMATION ================= */
+    else if(step === 1){
+      if(text.includes("हो")){
+        speak("मग " + medicine + " घ्या.");
+        speak("डोस असा आहे. " + doseInfo);
+
+        out.innerHTML +=
+          "<br><b>🩺 आजार:</b> " + disease +
+          "<br><b>💊 औषध:</b> " + medicine +
+          "<br><b>📋 कधी आणि कसं घ्यायचं:</b> " + doseInfo;
+
+        speak("धन्यवाद. स्वतःची काळजी घ्या.");
+      }
+      else{
+        speak("डॉक्टरांचा सल्ला घ्या.");
+      }
+      step = 0;
     }
   };
 }
 
-navigator.mediaDevices.getUserMedia({video:true})
+/* ================= CAMERA AUTO START ================= */
+navigator.mediaDevices.getUserMedia({ video:true })
 .then(stream=>{
-  cam.srcObject=stream;
-  status.innerText="👤 व्यक्ती ओळखली गेली आहे";
+  cam.srcObject = stream;
+  status.innerText = "👤 व्यक्ती ओळखली गेली आहे";
   greetUser();
   speak("तुला काय त्रास होतोय?");
-  setTimeout(startListening,3500);
+  setTimeout(startListening, 3500);
 });
 
+/* ================= EMERGENCY BUTTON ================= */
 function manualStart(){
   speak("कृपया तुमची समस्या सांगा");
-  step=0;
-  setTimeout(startListening,2500);
+  step = 0;
+  setTimeout(startListening, 2500);
 }
 </script>
 
