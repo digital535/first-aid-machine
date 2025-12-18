@@ -1,48 +1,75 @@
 <!DOCTYPE html>
-<html>
+<html lang="mr">
 <head>
-  <title>First-Aid Machine</title>
+<meta charset="UTF-8">
+<title>Automatic First-Aid Machine</title>
 </head>
-<body>
+
+<body style="font-family:Arial;text-align:center;">
 
 <h2>Automatic First-Aid Machine</h2>
 
 <!-- CAMERA -->
-<video id="cam" width="320" height="240" autoplay></video>
-<br><br>
+<video id="cam" width="320" height="240" autoplay playsinline></video>
+<p id="status" style="color:blue;font-weight:bold;"></p>
 
-<!-- MIC -->
-<button onclick="startVoice()">🎤 Speak Problem</button>
+<button onclick="startConversation()" style="font-size:16px;">
+  🎤 बोलायला सुरुवात करा
+</button>
 
 <p id="out" style="font-size:18px;color:green;"></p>
 
 <script>
-// CAMERA ACCESS
-navigator.mediaDevices.getUserMedia({ video: true })
-.then(stream => {
-  document.getElementById("cam").srcObject = stream;
-})
-.catch(() => {
-  alert("Camera permission denied");
+let step = 0;
+let detectedDisease = "";
+
+/* SPEAK FUNCTION (Marathi Voice) */
+function speak(text){
+  let msg = new SpeechSynthesisUtterance(text);
+  msg.lang = "mr-IN";
+  window.speechSynthesis.speak(msg);
+}
+
+/* CAMERA ON */
+navigator.mediaDevices.getUserMedia({ video:true })
+.then(stream=>{
+  cam.srcObject = stream;
+  status.innerText = "👤 व्यक्ती ओळखली गेली आहे";
+  speak("तुला काय त्रास होतोय?");
 });
 
-// MIC + VOICE
-function startVoice(){
+/* START VOICE CONVERSATION */
+function startConversation(){
   let r = new webkitSpeechRecognition();
-  r.lang = "en-IN";
+  r.lang = "mr-IN";
   r.start();
 
   r.onresult = function(e){
-    let text = e.results[0][0].transcript.toLowerCase();
+    let text = e.results[0][0].transcript;
+    out.innerHTML = "तू बोललास: " + text;
 
-    if(text.includes("fever")){
-      out.innerHTML = "Disease: Fever <br> Medicine: Paracetamol";
+    /* STEP 1 – Disease Detection */
+    if(step === 0){
+      if(text.includes("ताप")){
+        detectedDisease = "ताप";
+        step = 1;
+        speak("तुला ताप येतोय का?");
+      }
+      else{
+        speak("डॉक्टरांचा सल्ला घ्या");
+      }
     }
-    else if(text.includes("weak")){
-      out.innerHTML = "Disease: Weakness <br> Medicine: ORS";
-    }
-    else{
-      out.innerHTML = "Consult Doctor";
+
+    /* STEP 2 – Confirmation */
+    else if(step === 1){
+      if(text.includes("हो")){
+        step = 2;
+        speak("मग पॅरासिटामॉलची गोळी घ्या");
+        out.innerHTML += "<br>💊 औषध: पॅरासिटामॉल";
+      }
+      else{
+        speak("डॉक्टरांचा सल्ला घ्या");
+      }
     }
   };
 }
@@ -50,3 +77,4 @@ function startVoice(){
 
 </body>
 </html>
+s
