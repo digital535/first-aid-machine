@@ -40,12 +40,6 @@ video{
   border:3px solid #0d6efd;
   background:black;
 }
-#status{
-  margin-top:10px;
-  font-size:17px;
-  font-weight:bold;
-  color:#0d6efd;
-}
 #out{
   margin-top:15px;
   padding:12px;
@@ -72,14 +66,6 @@ video{
   background:#dc3545;
   color:white;
   font-weight:bold;
-  cursor:pointer;
-  box-shadow:0 0 15px rgba(220,53,69,0.7);
-}
-.warning{
-  margin-top:12px;
-  font-size:14px;
-  color:#b02a37;
-  font-weight:bold;
 }
 footer{
   margin-top:auto;
@@ -99,198 +85,156 @@ footer{
 
 <div class="card">
   <video id="cam" autoplay muted playsinline></video>
-  <div id="status">📷 Camera सुरू आहे</div>
-
   <div id="out">🤖 मशीन तयार आहे...</div>
   <div id="countdown"></div>
 
-  <button class="emergency" onclick="manualStart()">
-    🚨 Emergency / समस्या बोला
-  </button>
-
-  <div class="warning">
-    ⚠️ हे फक्त प्राथमिक उपचारांसाठी आहे. गंभीर आजारासाठी डॉक्टरांचा सल्ला घ्या.
-  </div>
+  <button class="emergency" onclick="manualStart()">🚨 Emergency / समस्या बोला</button>
 </div>
 
-<footer style="
-  background:linear-gradient(135deg,#fff8e1,#ffffff);
-  border-top:4px solid #0d6efd;
-  padding:18px;
-  text-align:center;
-  font-size:14px;
-">
-
-  <div style="
-    border:2px dashed #0d6efd;
-    border-radius:12px;
-    padding:15px;
-    background:#ffffff;
-  ">
-
-    <p style="
-      font-weight:bold;
-      color:#0d47a1;
-      font-size:15px;
-      line-height:1.6;
-      margin:0;
-    ">
-      वरील संकल्पना ही दत्तकला शिक्षण संस्थेतील  
-      कु. अर्चना आव्हाड, कु. साक्षी बगाडे, कु. स्नेहल राउत,  
-      स्नेहल जाधव, कु. गौरी खिलारे व कु. वैष्णवी जाधव  
-      या विद्यार्थिनींनी विकसित केली आहे.
-    </p>
-
-    <p style="
-      margin-top:10px;
-      font-size:12px;
-      color:#555;
-      font-style:italic;
-    ">
-      (Educational & Social Healthcare Innovation Project)
-    </p>
-
-  </div>
+<footer>
+<b>
+वरील संकल्पना ही दत्तकला शिक्षण संस्थेतील  
+कु. अर्चना आव्हाड, कु. साक्षी बगाडे, कु. स्नेहल राउत,  
+स्नेहल जाधव, कु. गौरी खिलारे व कु. वैष्णवी जाधव  
+या विद्यार्थिनींनी विकसित केली आहे.
+</b>
 </footer>
+
 <script>
-let step = 0;
-let disease="", medicine="", doseInfo="";
-let recognition;
-let resetting = false;
+/* ===== GLOBAL ===== */
+let step=0,disease="",medicine="",doseInfo="";
+let recognition,resetting=false;
 
-/* ================= SPEAK ================= */
-function speak(text, doReset=false){
-  out.innerHTML += "<br>🤖 <b>"+text+"</b>";
+/* ===== ESP32 ===== */
+const ESP32_IP="http://192.168.43.101"; // 🔴 ESP32 IP
 
-  let msg = new SpeechSynthesisUtterance(text);
-  msg.lang = "mr-IN";
-  msg.rate = 0.65;
-
-  if(doReset){
-    msg.onend = function(){
-      startCountdown(15);
-    };
-  }
-
-  speechSynthesis.cancel();
-  speechSynthesis.speak(msg);
+function sendToESP32(cmd){
+  fetch(ESP32_IP+"/"+cmd).catch(()=>{});
 }
 
-/* ================= COUNTDOWN ================= */
-function startCountdown(seconds){
-  resetting = true;
-  let c = seconds;
-  countdown.innerText = "⏳ Reset होत आहे : " + c + " सेकंद";
+/* ===== STOCK ===== */
+let stock={
+  "पॅरासिटामॉल":5,
+  "पेनकिलर":5,
+  "कोल्ड टॅब्लेट":5,
+  "खोकल्याची गोळी":5,
+  "अँटॅसिड":5,
+  "ORS":5,
+  "कॉटन आणि अँटिसेप्टिक":5
+};
 
-  speak("पंधरा सेकंदात प्रणाली reset होईल");
+/* ===== SPEAK ===== */
+function speak(text,reset=false){
+  out.innerHTML+="<br>🤖 <b>"+text+"</b>";
+  let msg=new SpeechSynthesisUtterance(text);
+  msg.lang="mr-IN"; msg.rate=0.65;
+  if(reset) msg.onend=()=>startCountdown(15);
+  speechSynthesis.cancel(); speechSynthesis.speak(msg);
+}
 
-  let timer = setInterval(()=>{
-    c--;
-    countdown.innerText = "⏳ Reset होत आहे : " + c + " सेकंद";
-    if(c <= 0){
-      clearInterval(timer);
-      location.reload();
-    }
+/* ===== COUNTDOWN ===== */
+function startCountdown(s){
+  resetting=true; let c=s;
+  countdown.innerText="⏳ Reset होत आहे : "+c+" सेकंद";
+  let t=setInterval(()=>{
+    c--; countdown.innerText="⏳ Reset होत आहे : "+c+" सेकंद";
+    if(c<=0){clearInterval(t); location.reload();}
   },1000);
 }
 
-/* ================= START LISTENING ================= */
+/* ===== LISTEN ===== */
 function startListening(){
-  if(resetting) return;
+ if(resetting) return;
+ recognition=new webkitSpeechRecognition();
+ recognition.lang="mr-IN"; recognition.start();
 
-  recognition = new webkitSpeechRecognition();
-  recognition.lang = "mr-IN";
-  recognition.start();
+ recognition.onresult=e=>{
+  let text=e.results[0][0].transcript;
+  out.innerHTML+="<br>🗣️ "+text;
 
-  recognition.onresult = function(e){
-    let text = e.results[0][0].transcript;
-    out.innerHTML += "<br>🗣️ " + text;
+  if(step===0){
+    if(text.includes("ताप")){
+      disease="ताप"; medicine="पॅरासिटामॉल";
+      doseInfo="६ ते ८ तासांनी, दिवसातून ३ वेळा. सकाळी, दुपारी आणि संध्याकाळी जेवणानंतर.";
+    }
+    else if(text.includes("डोके")){
+      disease="डोकेदुखी"; medicine="पेनकिलर";
+      doseInfo="दिवसातून २ वेळा. सकाळी आणि संध्याकाळी जेवणानंतर.";
+    }
+    else if(text.includes("सर्दी")){
+      disease="सर्दी"; medicine="कोल्ड टॅब्लेट";
+      doseInfo="दिवसातून २ वेळा. सकाळी आणि संध्याकाळी.";
+    }
+    else if(text.includes("खोकला")){
+      disease="खोकला"; medicine="खोकल्याची गोळी";
+      doseInfo="दिवसातून २ ते ३ वेळा. सकाळी, दुपारी आणि संध्याकाळी.";
+    }
+    else if(text.includes("पोट")){
+      disease="पोटदुखी"; medicine="अँटॅसिड";
+      doseInfo="जेवणानंतर दिवसातून २ वेळा. सकाळी आणि संध्याकाळी.";
+    }
+    else if(text.includes("जखम")){
+      disease="जखम"; medicine="कॉटन आणि अँटिसेप्टिक";
+      doseInfo="आधी अँटिसेप्टिक लावा, नंतर कॉटन वापरा.";
+    }
+    else if(text.includes("चक्कर")){
+      disease="चक्कर"; medicine="ORS";
+      doseInfo="ORS एक लिटर पाण्यात मिसळून हळूहळू प्या. दिवसातून २ ते ३ वेळा.";
+    }
+    else{
+      speak("लक्षणे स्पष्ट नाहीत. डॉक्टरांचा सल्ला घ्या.",true);
+      return;
+    }
+    step=1;
+    speak("तुला "+disease+" आहे का?");
+    setTimeout(startListening,3000);
+  }
 
-    if(step === 0){
-      if(text.includes("ताप")){
-        disease="ताप"; medicine="पॅरासिटामॉल";
-        doseInfo="६ ते ८ तासांनी, दिवसातून ३ वेळा. सकाळी, दुपारी आणि संध्याकाळी जेवणानंतर.";
-      }
-      else if(text.includes("डोके")){
-        disease="डोकेदुखी"; medicine="पेनकिलर";
-        doseInfo="दिवसातून २ वेळा. सकाळी आणि संध्याकाळी जेवणानंतर.";
-      }
-      else if(text.includes("सर्दी")){
-        disease="सर्दी"; medicine="कोल्ड टॅब्लेट";
-        doseInfo="दिवसातून २ वेळा. सकाळी आणि संध्याकाळी.";
-      }
-      else if(text.includes("खोकला")){
-        disease="खोकला"; medicine="खोकल्याची गोळी";
-        doseInfo="दिवसातून २ ते ३ वेळा. सकाळी, दुपारी आणि संध्याकाळी.";
-      }
-      else if(text.includes("पोट")){
-        disease="पोटदुखी"; medicine="अँटॅसिड";
-        doseInfo="जेवणानंतर दिवसातून २ वेळा. सकाळी आणि संध्याकाळी.";
-      }
-      else if(text.includes("जखम")){
-        disease="जखम"; medicine="कॉटन आणि अँटिसेप्टिक";
-        doseInfo="आधी अँटिसेप्टिक लावा, नंतर कॉटन वापरा.";
-      }
-      else if(text.includes("चक्कर")){
-        disease="चक्कर"; medicine="ORS";
-        doseInfo="ORS एक लिटर पाण्यात मिसळून हळूहळू प्या. दिवसातून २ ते ३ वेळा.";
-      }
-      else{
-        speak("लक्षणे स्पष्ट नाहीत. कृपया डॉक्टरांचा सल्ला घ्या.", true);
+  else if(step===1){
+    if(text.includes("हो")){
+      if(stock[medicine]<=0){
+        speak("माफ करा, हे औषध सध्या उपलब्ध नाही.",true);
         return;
       }
+      stock[medicine]--;
 
-      step = 1;
-      speak("तुला " + disease + " आहे का?");
-      setTimeout(startListening, 3000);
+      if(medicine==="पॅरासिटामॉल") sendToESP32("A");
+      else if(medicine==="कोल्ड टॅब्लेट") sendToESP32("B");
+      else if(medicine==="ORS") sendToESP32("C");
+
+      let warn="";
+      if(stock[medicine]<=2)
+        warn=" लक्ष द्या. या औषधाचा उरलेला साठा आहे "+stock[medicine]+" गोळ्या.";
+
+      speak(
+        "औषधाचे नाव आहे "+medicine+
+        ". डोस असा आहे. "+doseInfo+
+        warn+
+        " जर फरक पडला नाही तर डॉक्टरांचा सल्ला घ्या किंवा हॉस्पिटलमध्ये जा. धन्यवाद.",
+        true
+      );
+    } else {
+      speak("डॉक्टरांचा सल्ला घ्या.",true);
     }
-
-    else if(step === 1){
-      if(text.includes("हो")){
-        speak(
-          "औषधाचे नाव आहे " + medicine +
-          ". हे औषध घ्यायचा डोस असा आहे. " +
-          doseInfo +
-          " धन्यवाद. स्वतःची काळजी घ्या.",
-          true
-        );
-
-        out.innerHTML += `
-        <hr>
-        <div style="background:#e8f5e9;padding:12px;border-radius:10px;">
-          <b>🩺 आजार:</b> ${disease}<br><br>
-          <b>💊 औषध:</b> ${medicine}<br><br>
-          <b>📋 कधी आणि कसं घ्यायचं:</b><br>
-          ${doseInfo}
-        </div>
-        <hr>`;
-      }
-      else{
-        speak("डॉक्टरांचा सल्ला घ्या.", true);
-      }
-      step = 0;
-    }
-  };
+    step=0;
+  }
+ };
 }
 
-/* ================= CAMERA AUTO START ================= */
-navigator.mediaDevices.getUserMedia({ video:true, audio:false })
-.then(stream=>{
-  cam.srcObject = stream;
-  status.innerText = "👤 व्यक्ती ओळखली गेली आहे";
-  speak("तुला काय त्रास होतोय?");
-  setTimeout(startListening, 3000);
+/* ===== CAMERA AUTO ===== */
+navigator.mediaDevices.getUserMedia({video:true})
+.then(s=>{
+ cam.srcObject=s;
+ speak("तुला काय त्रास होतोय?");
+ setTimeout(startListening,3000);
 })
-.catch(()=>{
-  status.innerText = "❌ Camera permission नाकारली आहे";
-});
+.catch(()=>{});
 
-/* ================= EMERGENCY BUTTON ================= */
+/* ===== BUTTON ===== */
 function manualStart(){
-  if(resetting) return;
-  step = 0;
-  speak("कृपया तुमची समस्या सांगा");
-  setTimeout(startListening, 2500);
+ if(resetting) return;
+ step=0; speak("कृपया तुमची समस्या सांगा");
+ setTimeout(startListening,2500);
 }
 </script>
 
