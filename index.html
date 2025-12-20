@@ -85,10 +85,13 @@ footer{
 
 <div class="card">
   <video id="cam" autoplay muted playsinline></video>
+
   <div id="out">🤖 मशीन तयार आहे...</div>
   <div id="countdown"></div>
 
-  <button class="emergency" onclick="manualStart()">🚨 Emergency / समस्या बोला</button>
+  <button class="emergency" onclick="manualStart()">
+    🚨 Emergency / समस्या बोला
+  </button>
 </div>
 
 <footer>
@@ -101,63 +104,66 @@ footer{
 </footer>
 
 <script>
-/* ===== GLOBAL ===== */
-let step=0,disease="",medicine="",doseInfo="";
-let recognition,resetting=false;
+/* ========== GLOBAL ========== */
+let step = 0;
+let disease="", medicine="", doseInfo="";
+let recognition;
+let resetting = false;
 
-/* ===== ESP32 ===== */
-const ESP32_IP="http://192.168.43.101"; // 🔴 ESP32 IP
+/* ========== ESP32 IP ========== */
+const ESP32_IP = "http://192.168.43.101"; // 🔴 ESP32 IP इथे बदला
 
 function sendToESP32(cmd){
-  fetch(ESP32_IP+"/"+cmd).catch(()=>{});
+  fetch(ESP32_IP + "/" + cmd).catch(()=>{});
 }
 
-/* ===== STOCK ===== */
-let stock={
-  "पॅरासिटामॉल":5,
-  "पेनकिलर":5,
-  "कोल्ड टॅब्लेट":5,
-  "खोकल्याची गोळी":5,
-  "अँटॅसिड":5,
-  "ORS":5,
-  "कॉटन आणि अँटिसेप्टिक":5
-};
+/* ========== SPEAK ========== */
+function speak(text, reset=false){
+  out.innerHTML += "<br>🤖 <b>" + text + "</b>";
+  let msg = new SpeechSynthesisUtterance(text);
+  msg.lang = "mr-IN";
+  msg.rate = 0.65;
 
-/* ===== SPEAK ===== */
-function speak(text,reset=false){
-  out.innerHTML+="<br>🤖 <b>"+text+"</b>";
-  let msg=new SpeechSynthesisUtterance(text);
-  msg.lang="mr-IN"; msg.rate=0.65;
-  if(reset) msg.onend=()=>startCountdown(15);
-  speechSynthesis.cancel(); speechSynthesis.speak(msg);
+  if(reset){
+    msg.onend = ()=> startCountdown(15);
+  }
+
+  speechSynthesis.cancel();
+  speechSynthesis.speak(msg);
 }
 
-/* ===== COUNTDOWN ===== */
-function startCountdown(s){
-  resetting=true; let c=s;
-  countdown.innerText="⏳ Reset होत आहे : "+c+" सेकंद";
-  let t=setInterval(()=>{
-    c--; countdown.innerText="⏳ Reset होत आहे : "+c+" सेकंद";
-    if(c<=0){clearInterval(t); location.reload();}
+/* ========== COUNTDOWN ========== */
+function startCountdown(sec){
+  resetting = true;
+  let c = sec;
+  countdown.innerText = "⏳ Reset होत आहे : " + c + " सेकंद";
+
+  let t = setInterval(()=>{
+    c--;
+    countdown.innerText = "⏳ Reset होत आहे : " + c + " सेकंद";
+    if(c <= 0){
+      clearInterval(t);
+      location.reload();
+    }
   },1000);
 }
 
-/* ===== LISTEN ===== */
+/* ========== LISTEN ========== */
 function startListening(){
- if(resetting) return;
- recognition=new webkitSpeechRecognition();
- recognition.lang="mr-IN"; recognition.start();
+  if(resetting) return;
 
- recognition.onresult=e=>{
-  let text=e.results[0][0].transcript;
-  out.innerHTML+="<br>🗣️ "+text;
+  recognition = new webkitSpeechRecognition();
+  recognition.lang = "mr-IN";
+  recognition.start();
 
-  if(step===0){
-    if(text.includes("ताप")){
-      disease="ताप"; medicine="पॅरासिटामॉल";
-      doseInfo="६ ते ८ तासांनी, दिवसातून ३ वेळा. सकाळी, दुपारी आणि संध्याकाळी जेवणानंतर.";
-    }
-    else if(text.includes("डोके")){
+  recognition.onresult = function(e){
+    let text = e.results[0][0].transcript;
+    out.innerHTML += "<br>🗣️ " + text;
+
+    /* ===== STEP 0 : Disease Detect ===== */
+    if(step === 0){
+
+      else if(text.includes("डोके")){
       disease="डोकेदुखी"; medicine="पेनकिलर";
       doseInfo="दिवसातून २ वेळा. सकाळी आणि संध्याकाळी जेवणानंतर.";
     }
@@ -180,61 +186,62 @@ function startListening(){
     else if(text.includes("चक्कर")){
       disease="चक्कर"; medicine="ORS";
       doseInfo="ORS एक लिटर पाण्यात मिसळून हळूहळू प्या. दिवसातून २ ते ३ वेळा.";
-    }
-    else{
-      speak("लक्षणे स्पष्ट नाहीत. डॉक्टरांचा सल्ला घ्या.",true);
-      return;
-    }
-    step=1;
-    speak("तुला "+disease+" आहे का?");
-    setTimeout(startListening,3000);
-  }
-
-  else if(step===1){
-    if(text.includes("हो")){
-      if(stock[medicine]<=0){
-        speak("माफ करा, हे औषध सध्या उपलब्ध नाही.",true);
+      }
+      else{
+        speak("हा आजार या मशीनमध्ये उपलब्ध नाही. कृपया डॉक्टरांचा सल्ला घ्या.", true);
         return;
       }
-      stock[medicine]--;
 
-      if(medicine==="पॅरासिटामॉल") sendToESP32("A");
-      else if(medicine==="कोल्ड टॅब्लेट") sendToESP32("B");
-      else if(medicine==="ORS") sendToESP32("C");
-
-      let warn="";
-      if(stock[medicine]<=2)
-        warn=" लक्ष द्या. या औषधाचा उरलेला साठा आहे "+stock[medicine]+" गोळ्या.";
-
-      speak(
-        "औषधाचे नाव आहे "+medicine+
-        ". डोस असा आहे. "+doseInfo+
-        warn+
-        " जर फरक पडला नाही तर डॉक्टरांचा सल्ला घ्या किंवा हॉस्पिटलमध्ये जा. धन्यवाद.",
-        true
-      );
-    } else {
-      speak("डॉक्टरांचा सल्ला घ्या.",true);
+      step = 1;
+      speak("तुला " + disease + " आहे का?");
+      setTimeout(startListening, 3000);
     }
-    step=0;
-  }
- };
+
+    /* ===== STEP 1 : Confirmation ===== */
+    else if(step === 1){
+
+      if(text.includes("हो")){
+
+        // 🔥 CONTROLLER COMMAND (ONLY 4)
+        if(disease === "डोकेदुखी") sendToESP32("A");
+        else if(disease === "सर्दी") sendToESP32("B");
+        else if(disease === "खोकला") sendToESP32("C");
+        else if(disease === "पोटदुखी") sendToESP32("D");
+
+        speak(
+          "औषधाचे नाव आहे " + medicine +
+          ". हे औषध घ्यायचा डोस असा आहे. " +
+          doseInfo +
+          " जर हे औषध घेऊनही फरक पडला नाही, तर कृपया चांगल्या डॉक्टरांचा सल्ला घ्या किंवा जवळच्या हॉस्पिटलमध्ये जा. धन्यवाद.",
+          true
+        );
+      }
+      else{
+        speak("डॉक्टरांचा सल्ला घ्या.", true);
+      }
+
+      step = 0;
+    }
+  };
 }
 
-/* ===== CAMERA AUTO ===== */
+/* ========== CAMERA AUTO START ========== */
 navigator.mediaDevices.getUserMedia({video:true})
-.then(s=>{
- cam.srcObject=s;
- speak("तुला काय त्रास होतोय?");
- setTimeout(startListening,3000);
+.then(stream=>{
+  cam.srcObject = stream;
+  speak("तुला काय त्रास होतोय?");
+  setTimeout(startListening, 3000);
 })
-.catch(()=>{});
+.catch(()=>{
+  speak("कॅमेरा परवानगी मिळाली नाही.");
+});
 
-/* ===== BUTTON ===== */
+/* ========== EMERGENCY BUTTON ========== */
 function manualStart(){
- if(resetting) return;
- step=0; speak("कृपया तुमची समस्या सांगा");
- setTimeout(startListening,2500);
+  if(resetting) return;
+  step = 0;
+  speak("कृपया तुमची समस्या सांगा");
+  setTimeout(startListening, 2500);
 }
 </script>
 
