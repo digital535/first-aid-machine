@@ -102,19 +102,19 @@ footer{
 <audio id="beep" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
 
 <script>
+/* ===== GLOBAL ===== */
 let step = 0;
 let disease="", medicine="", doseInfo="";
-let recognition, resetting=false;
-let isSpeaking = false;
+let recognition, resetting=false, isSpeaking=false;
 
-/* WORD SETS */
+/* ===== WORD SETS ===== */
 const feverWords=["ताप","ताप येत आहे","ताप आहे","अंग तापत आहे"];
 const headWords=["डोके","डोकेदुखी","डोक दुखत","डोक दुखतय"];
 const coldWords=["सर्दी","सर्दी झाली"];
 const coughWords=["खोकला","खोकल येत"];
 const stomachWords=["पोट","पोट दुखत","पोटात दुखत"];
 
-/* USB */
+/* ===== USB SERIAL ===== */
 let port, writer;
 async function initUSB(){
   port = await navigator.serial.requestPort();
@@ -127,7 +127,7 @@ async function initUSB(){
 function manualUSB(){ initUSB(); }
 function sendUSB(cmd){ if(writer) writer.write(cmd); }
 
-/* SPEAK */
+/* ===== SPEAK ===== */
 function speak(text, reset=false){
   isSpeaking = true;
   out.innerHTML+="<br>🤖 <b>"+text+"</b>";
@@ -145,7 +145,7 @@ function speak(text, reset=false){
   speechSynthesis.speak(msg);
 }
 
-/* COUNTDOWN */
+/* ===== COUNTDOWN ===== */
 function startCountdown(sec){
   resetting=true;
   let c=sec;
@@ -159,10 +159,11 @@ function startCountdown(sec){
   },1000);
 }
 
-/* MIC */
+/* ===== MIC + BEEP FIX ===== */
 function beepAndListen(){
-  document.getElementById("beep").play();
-  startListening();
+  let b=document.getElementById("beep");
+  b.play();
+  b.onended=()=>startListening();
 }
 
 function startListening(){
@@ -174,8 +175,7 @@ function startListening(){
 
   recognition.onresult=e=>{
     let text=e.results[0][0].transcript.trim().toLowerCase();
-
-    if(text.length < 2) return;   // ✅ FIX 1
+    if(text.length<2) return;
 
     out.innerHTML+="<br>🗣️ "+text;
 
@@ -201,7 +201,7 @@ function startListening(){
         doseInfo="दिवसातून २ वेळा, सकाळी आणि संध्याकाळी जेवणानंतर घ्या.";
       }
       else{
-        speak("कृपया डॉक्टरांचा सल्ला घ्या.", true);
+        speak("कृपया डॉक्टरांचा सल्ला घ्या.",true);
         return;
       }
 
@@ -237,13 +237,13 @@ function startListening(){
   };
 
   recognition.onend=()=>{
-    if(!resetting && !isSpeaking){
-      setTimeout(()=>recognition.start(),800);
+    if(step===0 && !resetting && !isSpeaking){
+      setTimeout(()=>startListening(),800);
     }
   };
 }
 
-/* START */
+/* ===== START ===== */
 navigator.mediaDevices.getUserMedia({video:true})
 .then(s=>{
   cam.srcObject=s;
