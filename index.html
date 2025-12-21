@@ -113,9 +113,25 @@ let disease="", medicine="", doseInfo="";
 let recognition;
 let resetting = false;
 
-/* ========== ESP32 IP ========== */
-const ESP32_IP = "http://192.168.43.101"; // 🔴 ESP32 IP इथे बदला
+/* ========== ADD ONLY : Disease Word Variants ========== */
+const headacheWords = [
+  "डोके","डोके दुखी","डोकेदुखी","डोक दुखत आहे","डोक दुखतय","डोक दुखतं"
+];
+const coldWords = [
+  "सर्दी","सर्दी झाली आहे","सर्दी झाली"
+];
+const coughWords = [
+  "खोकला","खोकल येत आहे","खोकल","खोकला येतो"
+];
+const stomachWords = [
+  "पोट","पोट दुखत आहे","पोट दुखतय","पोटात दुखतं","पोट दुकट आहे"
+];
+const dizzinessWords = [
+  "चक्कर","चक्कर येतेय","गरगरत आहे"
+];
 
+/* ========== ESP32 IP ========== */
+const ESP32_IP = "http://192.168.43.101";
 function sendToESP32(cmd){
   fetch(ESP32_IP + "/" + cmd).catch(()=>{});
 }
@@ -126,11 +142,7 @@ function speak(text, reset=false){
   let msg = new SpeechSynthesisUtterance(text);
   msg.lang = "mr-IN";
   msg.rate = 0.65;
-
-  if(reset){
-    msg.onend = ()=> startCountdown(15);
-  }
-
+  if(reset) msg.onend = ()=> startCountdown(15);
   speechSynthesis.cancel();
   speechSynthesis.speak(msg);
 }
@@ -139,12 +151,10 @@ function speak(text, reset=false){
 function startCountdown(sec){
   resetting = true;
   let c = sec;
-  countdown.innerText = "⏳ Reset होत आहे : " + c + " सेकंद";
-
   let t = setInterval(()=>{
+    countdown.innerText = "⏳ Reset होत आहे : " + c;
     c--;
-    countdown.innerText = "⏳ Reset होत आहे : " + c + " सेकंद";
-    if(c <= 0){
+    if(c < 0){
       clearInterval(t);
       location.reload();
     }
@@ -167,35 +177,30 @@ function startListening(){
 
   recognition.onresult = function(e){
     let text = e.results[0][0].transcript;
+    text = text.toLowerCase(); // ADD ONLY
     out.innerHTML += "<br>🗣️ " + text;
 
-    /* ===== STEP 0 : Disease Detect ===== */
     if(step === 0){
 
-      /* 🔴 ADD ONLY : syntax fix */
-      if(true){
+      if(true){  // ADD ONLY (syntax safety)
 
-        if(text.includes("डोके")){
+        if(headacheWords.some(w=>text.includes(w))){
           disease="डोकेदुखी"; medicine="पेनकिलर";
           doseInfo="दिवसातून २ वेळा. सकाळी आणि संध्याकाळी जेवणानंतर.";
         }
-        else if(text.includes("सर्दी")){
+        else if(coldWords.some(w=>text.includes(w))){
           disease="सर्दी"; medicine="कोल्ड टॅब्लेट";
           doseInfo="दिवसातून २ वेळा. सकाळी आणि संध्याकाळी.";
         }
-        else if(text.includes("खोकला")){
+        else if(coughWords.some(w=>text.includes(w))){
           disease="खोकला"; medicine="खोकल्याची गोळी";
           doseInfo="दिवसातून २ ते ३ वेळा. सकाळी, दुपारी आणि संध्याकाळी.";
         }
-        else if(text.includes("पोट")){
+        else if(stomachWords.some(w=>text.includes(w))){
           disease="पोटदुखी"; medicine="अँटॅसिड";
           doseInfo="जेवणानंतर दिवसातून २ वेळा. सकाळी आणि संध्याकाळी.";
         }
-        else if(text.includes("जखम")){
-          disease="जखम"; medicine="कॉटन आणि अँटिसेप्टिक";
-          doseInfo="आधी अँटिसेप्टिक लावा, नंतर कॉटन वापरा.";
-        }
-        else if(text.includes("चक्कर")){
+        else if(dizzinessWords.some(w=>text.includes(w))){
           disease="चक्कर"; medicine="ORS";
           doseInfo="ORS एक लिटर पाण्यात मिसळून हळूहळू प्या. दिवसातून २ ते ३ वेळा.";
         }
@@ -207,37 +212,32 @@ function startListening(){
 
       step = 1;
       speak("तुला " + disease + " आहे का?");
-      beepAndListen();   // 🔔🎤 ADD ONLY
+      beepAndListen();
     }
 
-    /* ===== STEP 1 : Confirmation ===== */
     else if(step === 1){
-
       if(text.includes("हो")){
 
-        // 🔥 CONTROLLER COMMAND (ONLY 4)
-        if(disease === "डोकेदुखी") sendToESP32("A");
-        else if(disease === "सर्दी") sendToESP32("B");
-        else if(disease === "खोकला") sendToESP32("C");
-        else if(disease === "पोटदुखी") sendToESP32("D");
+        if(disease==="डोकेदुखी") sendToESP32("A");
+        else if(disease==="सर्दी") sendToESP32("B");
+        else if(disease==="खोकला") sendToESP32("C");
+        else if(disease==="पोटदुखी") sendToESP32("D");
 
         speak(
           "औषधाचे नाव आहे " + medicine +
           ". हे औषध घ्यायचा डोस असा आहे. " +
           doseInfo +
-          " जर हे औषध घेऊनही फरक पडला नाही, तर कृपया चांगल्या डॉक्टरांचा सल्ला घ्या किंवा जवळच्या हॉस्पिटलमध्ये जा. धन्यवाद.",
+          " जर फरक पडला नाही तर डॉक्टरांचा सल्ला घ्या.",
           true
         );
       }
       else{
         speak("डॉक्टरांचा सल्ला घ्या.", true);
       }
-
       step = 0;
     }
   };
 
-  /* 🔴 ADD ONLY : mic auto-restart */
   recognition.onend = function(){
     if(!resetting){
       setTimeout(()=> recognition.start(), 800);
@@ -250,7 +250,7 @@ navigator.mediaDevices.getUserMedia({video:true})
 .then(stream=>{
   cam.srcObject = stream;
   speak("तुला काय त्रास होतोय?");
-  beepAndListen();   // 🔔🎤 ADD ONLY
+  beepAndListen();
 })
 .catch(()=>{
   speak("कॅमेरा परवानगी मिळाली नाही.");
@@ -261,7 +261,7 @@ function manualStart(){
   if(resetting) return;
   step = 0;
   speak("कृपया तुमची समस्या सांगा");
-  beepAndListen();   // 🔔🎤 ADD ONLY
+  beepAndListen();
 }
 </script>
 
