@@ -55,6 +55,16 @@ video{
   color:#dc3545;
   text-align:center;
 }
+button{
+  margin-top:10px;
+  padding:12px;
+  font-size:16px;
+  border:none;
+  border-radius:10px;
+  background:#198754;
+  color:white;
+  font-weight:bold;
+}
 footer{
   margin-top:auto;
   width:100%;
@@ -73,6 +83,9 @@ footer{
 
 <div class="card">
   <video id="cam" autoplay muted playsinline></video>
+
+  <button onclick="manualUSB()">🔌 USB Connect</button>
+
   <div id="out">🤖 मशीन सुरू होत आहे...</div>
   <div id="countdown"></div>
 </div>
@@ -89,48 +102,54 @@ footer{
 <audio id="beep" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
 
 <script>
+/* ================= GLOBAL ================= */
 let step=0, disease="", medicine="", doseInfo="";
 let recognition, resetting=false;
 
-/* WORD VARIANTS */
-const feverWords=["ताप","ताप येत आहे","ताप आहे","ताप आला आहे","अंग तापत आहे"];
-const headacheWords=["डोके","डोकेदुखी","डोक दुखत","डोक दुखतय"];
+/* ================= WORD SETS ================= */
+const feverWords=["ताप","ताप येत आहे","ताप आहे","अंग तापत आहे"];
+const headWords=["डोके","डोकेदुखी","डोक दुखत","डोक दुखतय"];
 const coldWords=["सर्दी","सर्दी झाली"];
 const coughWords=["खोकला","खोकल येत"];
 const stomachWords=["पोट","पोट दुखत","पोटात दुखत"];
-const dizzinessWords=["चक्कर","चक्कर येतेय"];
 
-/* ESP32 */
-const ESP32_IP="http://192.168.43.101";
-function sendWiFi(cmd){
-  fetch(ESP32_IP+"/"+cmd).catch(()=>{});
-}
-
-/* USB */
+/* ================= USB SERIAL ================= */
 let port, writer;
+
 async function initUSB(){
-  try{
-    port=await navigator.serial.requestPort();
-    await port.open({baudRate:9600});
-    const encoder=new TextEncoderStream();
-    encoder.readable.pipeTo(port.writable);
-    writer=encoder.writable.getWriter();
-  }catch(e){}
+  port = await navigator.serial.requestPort();
+  await port.open({ baudRate:9600 });
+  const encoder=new TextEncoderStream();
+  encoder.readable.pipeTo(port.writable);
+  writer=encoder.writable.getWriter();
+  out.innerHTML+="<br>🔌 <b>USB Connected to ESP32</b>";
 }
+
+async function manualUSB(){
+  try{
+    await initUSB();
+    speak("USB यशस्वीपणे जोडले गेले आहे");
+  }catch{
+    speak("USB कनेक्ट झाले नाही");
+  }
+}
+
 function sendUSB(cmd){
   if(writer) writer.write(cmd);
 }
 
-/* SPEAK */
-function speak(text,reset=false){
+/* ================= SPEAK ================= */
+function speak(text, reset=false){
   out.innerHTML+="<br>🤖 <b>"+text+"</b>";
   let msg=new SpeechSynthesisUtterance(text);
-  msg.lang="mr-IN"; msg.rate=0.7;
-  if(reset) msg.onend=()=>startCountdown(15);
-  speechSynthesis.cancel(); speechSynthesis.speak(msg);
+  msg.lang="mr-IN";
+  msg.rate=0.7;
+  if(reset) msg.onend=()=>startCountdown(5);   // ✅ 5 सेकंद reset
+  speechSynthesis.cancel();
+  speechSynthesis.speak(msg);
 }
 
-/* COUNTDOWN */
+/* ================= COUNTDOWN ================= */
 function startCountdown(sec){
   resetting=true;
   let c=sec;
@@ -141,7 +160,7 @@ function startCountdown(sec){
   },1000);
 }
 
-/* MIC */
+/* ================= MIC ================= */
 function beepAndListen(){
   document.getElementById("beep").play();
   startListening();
@@ -159,36 +178,34 @@ function startListening(){
 
     if(step===0){
 
-      if(true){   // ✅ SYNTAX FIX
-
-        if(feverWords.some(w=>text.includes(w))){
-          disease="ताप"; medicine="पॅरासिटामॉल";
-          doseInfo="६ ते ८ तासांनी, दिवसातून ३ वेळा, सकाळी दुपारी संध्याकाळी जेवणानंतर घ्या.";
-        }
-        else if(headacheWords.some(w=>text.includes(w))){
-          disease="डोकेदुखी"; medicine="पेनकिलर";
-          doseInfo="दिवसातून २ वेळा सकाळी आणि संध्याकाळी जेवणानंतर.";
-        }
-        else if(coldWords.some(w=>text.includes(w))){
-          disease="सर्दी"; medicine="कोल्ड टॅब्लेट";
-          doseInfo="दिवसातून २ वेळा सकाळी आणि संध्याकाळी.";
-        }
-        else if(coughWords.some(w=>text.includes(w))){
-          disease="खोकला"; medicine="खोकल्याची गोळी";
-          doseInfo="दिवसातून २ ते ३ वेळा. सकाळी दुपारी संध्याकाळी जेवणानंतर घ्या";
-        }
-        else if(stomachWords.some(w=>text.includes(w))){
-          disease="पोटदुखी"; medicine="अँटॅसिड";
-          doseInfo="दिवसातून २ वेळा पट्टी करा .";
-        }
-        else if(dizzinessWords.some(w=>text.includes(w))){
-          disease="चक्कर"; medicine="ORS";
-          doseInfo="ORS 1 लिटर पाण्यात मिसळून दिवसातून ३ ते ४ वेळा प्या.";
-        }
-        else{
-          speak("कृपया डॉक्टरांचा सल्ला घ्या.",true);
-          return;
-        }
+      if(feverWords.some(w=>text.includes(w))){
+        disease="ताप";
+        medicine="पॅरासिटामॉल";
+        doseInfo="६ ते ८ तासांनी, दिवसातून ३ वेळा, सकाळी दुपारी संध्याकाळी जेवणानंतर घ्या.";
+      }
+      else if(headWords.some(w=>text.includes(w))){
+        disease="डोकेदुखी";
+        medicine="पेनकिलर";
+        doseInfo="दिवसातून २ वेळा, सकाळी आणि संध्याकाळी जेवणानंतर घ्या.";
+      }
+      else if(coldWords.some(w=>text.includes(w))){
+        disease="सर्दी";
+        medicine="कोल्ड टॅब्लेट";
+        doseInfo="दिवसातून २ वेळा.सकाळी आणिसंध्याकाळी जेवणानंतर घ्या";
+      }
+      else if(coughWords.some(w=>text.includes(w))){
+        disease="खोकला";
+        medicine="खोकल्याची गोळी";
+        doseInfo="दिवसातून २ ते ३ वेळा , सकाळी दुपारी संध्याकाळी जेवणानंतर घ्या.";
+      }
+      else if(stomachWords.some(w=>text.includes(w))){
+        disease="पोटदुखी";
+        medicine="अँटॅसिड";
+        doseInfo="दिवसातून २ वेळा,सकाळी आणि संध्याकाळी जेवणानंतर घ्या.";
+      }
+      else{
+        speak("कृपया डॉक्टरांचा सल्ला घ्या.",true);
+        return;
       }
 
       step=1;
@@ -198,19 +215,20 @@ function startListening(){
 
     else if(step===1){
       if(text.includes("हो")){
+
         let cmd="";
         if(disease==="डोकेदुखी") cmd="A";
         if(disease==="सर्दी") cmd="B";
         if(disease==="खोकला") cmd="C";
         if(disease==="पोटदुखी") cmd="D";
+        if(disease==="ताप") cmd="E";
 
-        sendWiFi(cmd);
         sendUSB(cmd);
 
         speak(
           "औषध आहे "+medicine+
           ". डोस: "+doseInfo+
-          ". जर फरक पडला नाही तर योग्य डॉक्टरांचा सल्ला घ्या.",
+          ". जर फरक पडला नाही तर डॉक्टरांचा सल्ला घ्या. स्वतःची काळजी घ्या, धन्यवाद.",
           true
         );
       }
@@ -222,15 +240,14 @@ function startListening(){
   };
 
   recognition.onend=()=>{
-    if(!resetting) setTimeout(()=>recognition.start(),800);
+    if(!resetting) setTimeout(()=>recognition.start(),700);
   };
 }
 
-/* START */
+/* ================= START ================= */
 navigator.mediaDevices.getUserMedia({video:true})
 .then(s=>{
   cam.srcObject=s;
-  initUSB();
   speak("कृपया तुमची समस्या सांगा");
   beepAndListen();
 });
