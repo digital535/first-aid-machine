@@ -47,7 +47,6 @@ video{
   border-radius:10px;
   min-height:120px;
   font-size:16px;
-  text-align:left;
 }
 #countdown{
   margin-top:10px;
@@ -58,9 +57,9 @@ video{
 }
 .emergency{
   width:100%;
-  margin-top:18px;
+  margin-top:15px;
   padding:15px;
-  font-size:20px;
+  font-size:18px;
   border:none;
   border-radius:12px;
   background:#dc3545;
@@ -97,15 +96,12 @@ footer{
 <div class="card">
   <video id="cam" autoplay muted playsinline></video>
 
-  <!-- 🔌 USB BUTTON ADDED -->
   <button class="usb" onclick="connectUSB()">🔌 USB Connect</button>
 
   <div id="out">🤖 मशीन तयार आहे...</div>
   <div id="countdown"></div>
 
-  <button class="emergency" onclick="manualStart()">
-    🚨 Emergency / समस्या बोला
-  </button>
+  <button class="emergency" onclick="manualStart()">🚨 Emergency / समस्या बोला</button>
 </div>
 
 <footer>
@@ -118,166 +114,148 @@ footer{
 </footer>
 
 <script>
-/* ========== GLOBAL ========== */
-let step = 0;
+/* ===== GLOBAL ===== */
+let step=0;
 let disease="", medicine="", doseInfo="";
-let recognition;
-let resetting = false;
+let recognition, resetting=false;
 
-/* ========== ESP32 IP (Wi-Fi) ========== */
-const ESP32_IP = "http://192.168.43.101"; // 🔴 ESP32 IP इथे बदला
+/* ===== WORD SETS ===== */
+const feverWords=["ताप","ताप येत आहे","ताप आहे","अंग तापत आहे"];
+const headWords=["डोके","डोकेदुखी","डोक दुखत","डोक दुखतय"];
+const coldWords=["सर्दी","सर्दी झाली"];
+const coughWords=["खोकला","खोकल येत"];
+const stomachWords=["पोट","पोट दुखत","पोटात दुखत"];
 
+/* ===== ESP32 WIFI ===== */
+const ESP32_IP="http://192.168.43.101";
 function sendToESP32(cmd){
-  fetch(ESP32_IP + "/" + cmd).catch(()=>{});
+  fetch(ESP32_IP+"/"+cmd).catch(()=>{});
 }
 
-/* ========== 🔌 USB SERIAL (ADDED) ========== */
+/* ===== USB SERIAL ===== */
 let usbPort, usbWriter;
-
 async function connectUSB(){
   try{
-    usbPort = await navigator.serial.requestPort();
-    await usbPort.open({ baudRate:9600 });
-
-    const encoder = new TextEncoderStream();
+    usbPort=await navigator.serial.requestPort();
+    await usbPort.open({baudRate:9600});
+    const encoder=new TextEncoderStream();
     encoder.readable.pipeTo(usbPort.writable);
-    usbWriter = encoder.writable.getWriter();
-
-    out.innerHTML += "<br>🔌 <b>USB Connected</b>";
-  }catch(e){
-    out.innerHTML += "<br>❌ USB Connection Failed";
+    usbWriter=encoder.writable.getWriter();
+    out.innerHTML+="<br>🔌 <b>USB Connected</b>";
+  }catch{
+    out.innerHTML+="<br>❌ USB Failed";
   }
 }
-
 function sendUSB(cmd){
-  if(usbWriter){
-    usbWriter.write(cmd);
-  }
+  if(usbWriter) usbWriter.write(cmd);
 }
 
-/* ========== SPEAK ========== */
+/* ===== SPEAK ===== */
 function speak(text, reset=false){
-  out.innerHTML += "<br>🤖 <b>" + text + "</b>";
-  let msg = new SpeechSynthesisUtterance(text);
-  msg.lang = "mr-IN";
-  msg.rate = 0.65;
-
-  if(reset){
-    msg.onend = ()=> startCountdown(15);
-  }
-
+  out.innerHTML+="<br>🤖 <b>"+text+"</b>";
+  let msg=new SpeechSynthesisUtterance(text);
+  msg.lang="mr-IN";
+  msg.rate=0.65;
+  if(reset) msg.onend=()=>startCountdown(15);
   speechSynthesis.cancel();
   speechSynthesis.speak(msg);
 }
 
-/* ========== COUNTDOWN ========== */
+/* ===== RESET ===== */
 function startCountdown(sec){
-  resetting = true;
-  let c = sec;
-  countdown.innerText = "⏳ Reset होत आहे : " + c + " सेकंद";
-
-  let t = setInterval(()=>{
+  resetting=true;
+  let c=sec;
+  let t=setInterval(()=>{
+    countdown.innerText="⏳ Reset : "+c;
     c--;
-    countdown.innerText = "⏳ Reset होत आहे : " + c + " सेकंद";
-    if(c <= 0){
-      clearInterval(t);
-      location.reload();
-    }
+    if(c<0){clearInterval(t);location.reload();}
   },1000);
 }
 
-/* ========== LISTEN ========== */
+/* ===== LISTEN ===== */
 function startListening(){
   if(resetting) return;
 
-  recognition = new webkitSpeechRecognition();
-  recognition.lang = "mr-IN";
+  recognition=new webkitSpeechRecognition();
+  recognition.lang="mr-IN";
   recognition.start();
 
-  recognition.onresult = function(e){
-    let text = e.results[0][0].transcript;
-    out.innerHTML += "<br>🗣️ " + text;
+  recognition.onresult=e=>{
+    let text=e.results[0][0].transcript;
+    out.innerHTML+="<br>🗣️ "+text;
 
-    if(step === 0){
+    if(step===0){
 
-      if(text.includes("डोके") || text.includes("डोकं")){
-        disease="डोकेदुखी";
-        medicine="पेनकिलर";
-        doseInfo="दिवसातून २ वेळा. सकाळी आणि संध्याकाळी जेवणानंतर.";
+      if(feverWords.some(w=>text.includes(w))){
+        disease="ताप"; medicine="पॅरासिटामॉल";
+        doseInfo="६ ते ८ तासांनी, दिवसातून ३ वेळा जेवणानंतर घ्या.";
       }
-      else if(text.includes("सर्दी")){
-        disease="सर्दी";
-        medicine="कोल्ड टॅब्लेट";
-        doseInfo="दिवसातून २ वेळा. सकाळी आणि संध्याकाळी.";
+      else if(headWords.some(w=>text.includes(w))){
+        disease="डोकेदुखी"; medicine="पेनकिलर";
+        doseInfo="दिवसातून २ वेळा जेवणानंतर.";
       }
-      else if(text.includes("खोकला")){
-        disease="खोकला";
-        medicine="खोकल्याची गोळी";
-        doseInfo="दिवसातून २ ते ३ वेळा. सकाळी, दुपारी आणि संध्याकाळी.";
+      else if(coldWords.some(w=>text.includes(w))){
+        disease="सर्दी"; medicine="कोल्ड टॅब्लेट";
+        doseInfo="दिवसातून २ वेळा.";
       }
-      else if(text.includes("पोट")){
-        disease="पोटदुखी";
-        medicine="अँटॅसिड";
-        doseInfo="जेवणानंतर दिवसातून २ वेळा. सकाळी आणि संध्याकाळी.";
+      else if(coughWords.some(w=>text.includes(w))){
+        disease="खोकला"; medicine="खोकल्याची गोळी";
+        doseInfo="दिवसातून २ ते ३ वेळा.";
+      }
+      else if(stomachWords.some(w=>text.includes(w))){
+        disease="पोटदुखी"; medicine="अँटॅसिड";
+        doseInfo="दिवसातून २ वेळा.";
       }
       else{
-        speak("हा आजार या मशीनमध्ये उपलब्ध नाही. कृपया डॉक्टरांचा सल्ला घ्या.", true);
+        speak("कृपया डॉक्टरांचा सल्ला घ्या.",true);
         return;
       }
 
-      step = 1;
-      speak("तुला " + disease + " आहे का?");
-      setTimeout(startListening, 3000);
+      step=1;
+      speak("तुला "+disease+" आहे का?");
+      setTimeout(startListening,3000);
     }
 
-    else if(step === 1){
-
+    else if(step===1){
       if(text.includes("हो")){
-
         let cmd="";
-        if(disease === "डोकेदुखी") cmd="A";
-        else if(disease === "सर्दी") cmd="B";
-        else if(disease === "खोकला") cmd="C";
-        else if(disease === "पोटदुखी") cmd="D";
+        if(disease==="डोकेदुखी") cmd="A";
+        else if(disease==="सर्दी") cmd="B";
+        else if(disease==="खोकला") cmd="C";
+        else if(disease==="पोटदुखी") cmd="D";
+        else if(disease==="ताप") cmd="E";
 
-        /* 🔥 SEND BOTH (Wi-Fi + USB) */
         sendToESP32(cmd);
         sendUSB(cmd);
 
         speak(
-          "औषधाचे नाव आहे " + medicine +
-          ". हे औषध घ्यायचा डोस असा आहे. " +
-          doseInfo +
-          " जर हे औषध घेऊनही फरक पडला नाही, तर कृपया डॉक्टरांचा सल्ला घ्या. धन्यवाद.",
+          "औषध "+medicine+" आहे. डोस असा आहे. "+
+          doseInfo+
+          " फरक न पडल्यास डॉक्टरांचा सल्ला घ्या.",
           true
         );
+      }else{
+        speak("डॉक्टरांचा सल्ला घ्या.",true);
       }
-      else{
-        speak("डॉक्टरांचा सल्ला घ्या.", true);
-      }
-
-      step = 0;
+      step=0;
     }
   };
 }
 
-/* ========== CAMERA AUTO START ========== */
+/* ===== START CAMERA ===== */
 navigator.mediaDevices.getUserMedia({video:true})
-.then(stream=>{
-  cam.srcObject = stream;
+.then(s=>{
+  cam.srcObject=s;
   speak("तुला काय त्रास होतोय?");
-  setTimeout(startListening, 3000);
-})
-.catch(()=>{
-  speak("कॅमेरा परवानगी मिळाली नाही.");
+  setTimeout(startListening,3000);
 });
 
-/* ========== EMERGENCY BUTTON ========== */
+/* ===== EMERGENCY ===== */
 function manualStart(){
   if(resetting) return;
-  step = 0;
+  step=0;
   speak("कृपया तुमची समस्या सांगा");
-  setTimeout(startListening, 2500);
+  setTimeout(startListening,2500);
 }
 </script>
 
