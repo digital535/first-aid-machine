@@ -6,72 +6,63 @@
 <title>Automatic First-Aid Machine</title>
 
 <style>
-body {
-  margin: 0;
-  font-family: "Segoe UI", Arial, sans-serif;
-  background: linear-gradient(135deg,#e3f2fd,#ffffff);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+body{
+  margin:0;
+  font-family:"Segoe UI",Arial,sans-serif;
+  background:linear-gradient(135deg,#e3f2fd,#ffffff);
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
 }
-header {
-  width: 100%;
-  padding: 15px;
-  background: #0d6efd;
-  color: white;
-  font-size: 26px;
-  font-weight: bold;
-  text-align: center;
+header{
+  width:100%;
+  padding:15px;
+  background:#0d6efd;
+  color:white;
+  font-size:26px;
+  font-weight:bold;
+  text-align:center;
 }
-.card {
-  background: white;
-  width: 95%;
-  max-width: 420px;
-  margin-top: 20px;
-  padding: 20px;
-  border-radius: 20px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+.card{
+  background:white;
+  width:95%;
+  max-width:420px;
+  margin-top:20px;
+  padding:20px;
+  border-radius:20px;
+  box-shadow:0 10px 25px rgba(0,0,0,0.15);
 }
-video {
-  width: 100%;
-  height: 240px;
-  border-radius: 12px;
-  border: 3px solid #0d6efd;
-  background: black;
+video{
+  width:100%;
+  height:240px;
+  border-radius:12px;
+  border:3px solid #0d6efd;
+  background:black;
 }
-#out {
-  margin-top: 15px;
-  padding: 12px;
-  background: #f8f9fa;
-  border-radius: 10px;
-  min-height: 120px;
-  font-size: 16px;
+#out{
+  margin-top:15px;
+  padding:12px;
+  background:#f8f9fa;
+  border-radius:10px;
+  min-height:120px;
+  font-size:16px;
 }
-button {
-  margin-top: 12px;
-  padding: 12px;
-  font-size: 18px;
-  width: 100%;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
+#countdown{
+  margin-top:10px;
+  font-size:18px;
+  font-weight:bold;
+  color:#dc3545;
+  text-align:center;
 }
-#connectUSB {
-  background: #28a745;
-  color: white;
-}
-#wifiSend {
-  background: #0d6efd;
-  color: white;
-}
-footer {
-  margin-top: auto;
-  width: 100%;
-  background: #f1f1f1;
-  padding: 15px;
-  text-align: center;
-  font-size: 13px;
-  border-top: 2px solid #ccc;
+footer{
+  margin-top:auto;
+  width:100%;
+  background:#f1f1f1;
+  padding:15px;
+  text-align:center;
+  font-size:13px;
+  border-top:2px solid #ccc;
 }
 </style>
 </head>
@@ -82,14 +73,8 @@ footer {
 
 <div class="card">
   <video id="cam" autoplay muted playsinline></video>
-
-  <div id="out">🤖 मशीन तयार आहे...</div>
-
-  <!-- Wi-Fi / ESP32 -->
-  <button id="wifiSend">📡 Connect/Send Wi-Fi Command</button>
-
-  <!-- USB Serial -->
-  <button id="connectUSB">🔌 Connect USB to ESP32</button>
+  <div id="out">🤖 मशीन सुरू होत आहे...</div>
+  <div id="countdown"></div>
 </div>
 
 <footer>
@@ -101,108 +86,137 @@ footer {
 </b>
 </footer>
 
-<!-- Beep sound -->
 <audio id="beep" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
 
 <script>
+let step=0, disease="", medicine="", doseInfo="";
+let recognition, resetting=false;
 
-// ================= GLOBAL =================
-
-let step=0, disease="", medicine="", doseInfo="", recognition, resetting=false;
-
-// Word variants
-const headacheWords=["डोके","डोकेदुखी","डोके दुखी","डोक दुखत","डोक दुखतय"];
-const coldWords=["सर्दी","सर्दी झाली","सर्दी झाली आहे"];
-const coughWords=["खोकला","खोकल येत","खोकल्याची"];
+/* WORD VARIANTS */
+const feverWords=["ताप","ताप येत आहे","ताप आहे","ताप आला आहे","अंग तापत आहे"];
+const headacheWords=["डोके","डोकेदुखी","डोक दुखत","डोक दुखतय"];
+const coldWords=["सर्दी","सर्दी झाली"];
+const coughWords=["खोकला","खोकल येत"];
 const stomachWords=["पोट","पोट दुखत","पोटात दुखत"];
 const dizzinessWords=["चक्कर","चक्कर येतेय"];
 
-// ================= Wi-Fi SEND =================
-const ESP32_IP = "http://192.168.43.101"; // 🔴 सेट करा
-function sendToESP32(cmd) {
-  fetch(ESP32_IP + "/" + cmd).catch(()=> {
-    out.innerHTML += "<br>❌ Wi-Fi send fail";
-  });
+/* ESP32 */
+const ESP32_IP="http://192.168.43.101";
+function sendWiFi(cmd){
+  fetch(ESP32_IP+"/"+cmd).catch(()=>{});
 }
 
-// ================= SPEAK =================
-function speak(text, reset=false){
-  out.innerHTML += "<br>🤖 <b>"+text+"</b>";
+/* USB */
+let port, writer;
+async function initUSB(){
+  try{
+    port=await navigator.serial.requestPort();
+    await port.open({baudRate:9600});
+    const encoder=new TextEncoderStream();
+    encoder.readable.pipeTo(port.writable);
+    writer=encoder.writable.getWriter();
+  }catch(e){}
+}
+function sendUSB(cmd){
+  if(writer) writer.write(cmd);
+}
+
+/* SPEAK */
+function speak(text,reset=false){
+  out.innerHTML+="<br>🤖 <b>"+text+"</b>";
   let msg=new SpeechSynthesisUtterance(text);
   msg.lang="mr-IN"; msg.rate=0.7;
   if(reset) msg.onend=()=>startCountdown(15);
   speechSynthesis.cancel(); speechSynthesis.speak(msg);
 }
 
-// ================= COUNTDOWN =================
+/* COUNTDOWN */
 function startCountdown(sec){
   resetting=true;
   let c=sec;
-  let timer=setInterval(()=>{
-    document.getElementById("countdown").innerText="⏳ Reset : "+c;
+  let t=setInterval(()=>{
+    countdown.innerText="⏳ Reset : "+c;
     c--;
-    if(c<0){ clearInterval(timer); location.reload(); }
+    if(c<0){ clearInterval(t); location.reload(); }
   },1000);
 }
 
-// ================= BEEP + MIC =================
+/* MIC */
 function beepAndListen(){
   document.getElementById("beep").play();
   startListening();
 }
 
-// ================= SPEECH LISTEN =================
 function startListening(){
   if(resetting) return;
   recognition=new webkitSpeechRecognition();
-  recognition.lang="mr-IN"; recognition.start();
+  recognition.lang="mr-IN";
+  recognition.start();
 
   recognition.onresult=e=>{
     let text=e.results[0][0].transcript.toLowerCase();
-    out.innerHTML += "<br>🗣️ "+text;
+    out.innerHTML+="<br>🗣️ "+text;
 
     if(step===0){
-      if(headacheWords.some(w=>text.includes(w))){
-        disease="डोकेदुखी"; medicine="पेनकिलर";
-        doseInfo="दिवसातून २ वेळा.";
+
+      if(true){   // ✅ SYNTAX FIX
+
+        if(feverWords.some(w=>text.includes(w))){
+          disease="ताप"; medicine="पॅरासिटामॉल";
+          doseInfo="६ ते ८ तासांनी, दिवसातून ३ वेळा, सकाळी दुपारी संध्याकाळी जेवणानंतर घ्या.";
+        }
+        else if(headacheWords.some(w=>text.includes(w))){
+          disease="डोकेदुखी"; medicine="पेनकिलर";
+          doseInfo="दिवसातून २ वेळा सकाळी आणि संध्याकाळी जेवणानंतर.";
+        }
+        else if(coldWords.some(w=>text.includes(w))){
+          disease="सर्दी"; medicine="कोल्ड टॅब्लेट";
+          doseInfo="दिवसातून २ वेळा सकाळी आणि संध्याकाळी.";
+        }
+        else if(coughWords.some(w=>text.includes(w))){
+          disease="खोकला"; medicine="खोकल्याची गोळी";
+          doseInfo="दिवसातून २ ते ३ वेळा. सकाळी दुपारी संध्याकाळी जेवणानंतर घ्या";
+        }
+        else if(stomachWords.some(w=>text.includes(w))){
+          disease="पोटदुखी"; medicine="अँटॅसिड";
+          doseInfo="दिवसातून २ वेळा पट्टी करा .";
+        }
+        else if(dizzinessWords.some(w=>text.includes(w))){
+          disease="चक्कर"; medicine="ORS";
+          doseInfo="ORS 1 लिटर पाण्यात मिसळून दिवसातून ३ ते ४ वेळा प्या.";
+        }
+        else{
+          speak("कृपया डॉक्टरांचा सल्ला घ्या.",true);
+          return;
+        }
       }
-      else if(coldWords.some(w=>text.includes(w))){
-        disease="सर्दी"; medicine="कोल्ड टॅब्लेट";
-        doseInfo="दिवसातून २ वेळा.";
-      }
-      else if(coughWords.some(w=>text.includes(w))){
-        disease="खोकला"; medicine="खोकल्याची गोळी";
-        doseInfo="दिवसातून २–३ वेळा.";
-      }
-      else if(stomachWords.some(w=>text.includes(w))){
-        disease="पोटदुखी"; medicine="अँटॅसिड";
-        doseInfo="दिवसातून २ वेळा.";
-      }
-      else if(dizzinessWords.some(w=>text.includes(w))){
-        disease="चक्कर"; medicine="ORS";
-        doseInfo="ORS मिसळून प्या.";
-      }
-      else{
-        speak("कृपया तुमची समस्या पुन्हा सांगा");
-        beepAndListen();
-        return;
-      }
+
       step=1;
       speak("तुला "+disease+" आहे का?");
       beepAndListen();
     }
+
     else if(step===1){
       if(text.includes("हो")){
-        // Wi-Fi send
         let cmd="";
         if(disease==="डोकेदुखी") cmd="A";
         if(disease==="सर्दी") cmd="B";
         if(disease==="खोकला") cmd="C";
         if(disease==="पोटदुखी") cmd="D";
-        sendToESP32(cmd);
-        speak("औषध:"+medicine+". "+doseInfo+" जर फरक नाही तर योग्य डॉक्टरांचा सल्ला घ्य किंवा नजीकच्या हॉस्पिटल मध्ये जावा .", true);
+
+        sendWiFi(cmd);
+        sendUSB(cmd);
+
+        speak(
+          "औषध आहे "+medicine+
+          ". डोस: "+doseInfo+
+          ". जर फरक पडला नाही तर योग्य डॉक्टरांचा सल्ला घ्या.",
+          true
+        );
       }
-      else{ speak("डॉक्टरांचा सल्ला घ्या.", true); }
+      else{
+        speak("कृपया डॉक्टरांचा सल्ला घ्या.",true);
+      }
       step=0;
     }
   };
@@ -212,50 +226,14 @@ function startListening(){
   };
 }
 
-// ================= CAMERA =================
+/* START */
 navigator.mediaDevices.getUserMedia({video:true})
-.then(s=>{ cam.srcObject=s; speak("तुला काय त्रास?"); beepAndListen(); })
-.catch(()=> speak("कॅमेरा परवानगी नाही."));
-
-// ================= Manual ================
-function manualStart(){
-  if(resetting) return;
-  step=0; speak("कृपया समस्या सांगा"); beepAndListen();
-}
-
-// ================= USB SERIAL CODE =============
-let serialPort, textEncoder, writableStream;
-
-document.getElementById("connectUSB").onclick = async () => {
-  try {
-    serialPort = await navigator.serial.requestPort();
-    await serialPort.open({ baudRate: 9600 });
-    textEncoder=new TextEncoderStream();
-    writableStream=textEncoder.readable.pipeTo(serialPort.writable);
-    out.innerHTML += "<br>🔌 USB Connected to ESP32";
-  } catch(err) {
-    out.innerHTML += "<br>❌ USB Connect Failed";
-  }
-};
-
-function sendUSB(cmd){
-  if(!writableStream){
-    alert("पहिले USB Connect करा");
-    return;
-  }
-  const writer=textEncoder.writable.getWriter();
-  writer.write(cmd);
-  writer.releaseLock();
-  out.innerHTML += "<br>📤 USB CMD:"+cmd;
-}
-
-// Optional: Buttons for USB
-// e.g., call sendUSB("A") when needed
-document.getElementById("wifiSend").onclick = ()=>{
-  let c = prompt("Enter Command (A/B/C/D):");
-  if(c) sendUSB(c.toUpperCase());
-};
-
+.then(s=>{
+  cam.srcObject=s;
+  initUSB();
+  speak("कृपया तुमची समस्या सांगा");
+  beepAndListen();
+});
 </script>
 
 </body>
