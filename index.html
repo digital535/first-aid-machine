@@ -102,20 +102,20 @@ footer{
 <audio id="beep" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
 
 <script>
-/* ================= GLOBAL ================= */
-let step=0, disease="", medicine="", doseInfo="";
+let step = 0;
+let disease="", medicine="", doseInfo="";
 let recognition, resetting=false;
+let isSpeaking = false;
 
-/* ================= WORD SETS ================= */
+/* WORD SETS */
 const feverWords=["ताप","ताप येत आहे","ताप आहे","अंग तापत आहे"];
 const headWords=["डोके","डोकेदुखी","डोक दुखत","डोक दुखतय"];
 const coldWords=["सर्दी","सर्दी झाली"];
 const coughWords=["खोकला","खोकल येत"];
 const stomachWords=["पोट","पोट दुखत","पोटात दुखत"];
 
-/* ================= USB SERIAL ================= */
+/* USB */
 let port, writer;
-
 async function initUSB(){
   port = await navigator.serial.requestPort();
   await port.open({ baudRate:9600 });
@@ -124,36 +124,28 @@ async function initUSB(){
   writer=encoder.writable.getWriter();
   out.innerHTML+="<br>🔌 <b>USB Connected to ESP32</b>";
 }
+function manualUSB(){ initUSB(); }
+function sendUSB(cmd){ if(writer) writer.write(cmd); }
 
-async function manualUSB(){
-  try{
-    await initUSB();
-    speak("यूएसबी यशस्वीपणे जोडले गेले आहे");
-  }catch{
-    speak("यूएसबी कनेक्ट झाले नाही");
-  }
-}
-
-function sendUSB(cmd){
-  if(writer) writer.write(cmd);
-}
-
-/* ================= SPEAK ================= */
+/* SPEAK */
 function speak(text, reset=false){
+  isSpeaking = true;
   out.innerHTML+="<br>🤖 <b>"+text+"</b>";
+
   let msg=new SpeechSynthesisUtterance(text);
   msg.lang="mr-IN";
   msg.rate=0.7;
 
-  if(reset){
-    msg.onend=()=>startCountdown(5);
-  }
+  msg.onend=()=>{
+    isSpeaking=false;
+    if(reset) startCountdown(5);
+  };
 
   speechSynthesis.cancel();
   speechSynthesis.speak(msg);
 }
 
-/* ================= COUNTDOWN ================= */
+/* COUNTDOWN */
 function startCountdown(sec){
   resetting=true;
   let c=sec;
@@ -167,48 +159,45 @@ function startCountdown(sec){
   },1000);
 }
 
-/* ================= MIC ================= */
+/* MIC */
 function beepAndListen(){
   document.getElementById("beep").play();
   startListening();
 }
 
 function startListening(){
-  if(resetting) return;
+  if(resetting || isSpeaking) return;
 
   recognition=new webkitSpeechRecognition();
   recognition.lang="mr-IN";
   recognition.start();
 
   recognition.onresult=e=>{
-    let text=e.results[0][0].transcript.toLowerCase();
+    let text=e.results[0][0].transcript.trim().toLowerCase();
+
+    if(text.length < 2) return;   // ✅ FIX 1
+
     out.innerHTML+="<br>🗣️ "+text;
 
     if(step===0){
-
       if(feverWords.some(w=>text.includes(w))){
-        disease="ताप";
-        medicine="पॅरासिटामॉल";
+        disease="ताप"; medicine="पॅरासिटामॉल";
         doseInfo="६ ते ८ तासांनी, दिवसातून ३ वेळा, सकाळी दुपारी संध्याकाळी जेवणानंतर घ्या.";
       }
       else if(headWords.some(w=>text.includes(w))){
-        disease="डोकेदुखी";
-        medicine="पेनकिलर";
+        disease="डोकेदुखी"; medicine="पेनकिलर";
         doseInfo="दिवसातून २ वेळा, सकाळी आणि संध्याकाळी जेवणानंतर घ्या.";
       }
       else if(coldWords.some(w=>text.includes(w))){
-        disease="सर्दी";
-        medicine="कोल्ड टॅब्लेट";
+        disease="सर्दी"; medicine="कोल्ड टॅब्लेट";
         doseInfo="दिवसातून २ वेळा, सकाळी आणि संध्याकाळी जेवणानंतर घ्या.";
       }
       else if(coughWords.some(w=>text.includes(w))){
-        disease="खोकला";
-        medicine="खोकल्याची गोळी";
+        disease="खोकला"; medicine="खोकल्याची गोळी";
         doseInfo="दिवसातून २ ते ३ वेळा, सकाळी दुपारी संध्याकाळी जेवणानंतर घ्या.";
       }
       else if(stomachWords.some(w=>text.includes(w))){
-        disease="पोटदुखी";
-        medicine="अँटॅसिड";
+        disease="पोटदुखी"; medicine="अँटॅसिड";
         doseInfo="दिवसातून २ वेळा, सकाळी आणि संध्याकाळी जेवणानंतर घ्या.";
       }
       else{
@@ -223,7 +212,6 @@ function startListening(){
 
     else if(step===1){
       if(text.includes("हो")){
-
         let cmd="";
         if(disease==="डोकेदुखी") cmd="A";
         if(disease==="सर्दी") cmd="B";
@@ -238,26 +226,24 @@ function startListening(){
           ". हे औषध कधी आणि कसं घ्यायचं ते नीट ऐका. "+
           doseInfo+
           ". जर हे औषध घेऊनही फरक पडला नाही, तर चांगल्या डॉक्टरांचा सल्ला घ्या. "+
-          "स्वतःची काळजी घ्या, धन्यवाद.",
+          "स्वतःची काळजी घ्या. धन्यवाद.",
           true
         );
-      }
-      else{
+      } else {
         speak("ठीक आहे.", true);
       }
       step=0;
     }
   };
 
-  /* 🔥 FIX : औषध सांगताना mic परत चालू होणार नाही */
   recognition.onend=()=>{
-    if(step===0 && !resetting){
-      setTimeout(()=>recognition.start(),700);
+    if(!resetting && !isSpeaking){
+      setTimeout(()=>recognition.start(),800);
     }
   };
 }
 
-/* ================= START ================= */
+/* START */
 navigator.mediaDevices.getUserMedia({video:true})
 .then(s=>{
   cam.srcObject=s;
