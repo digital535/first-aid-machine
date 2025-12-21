@@ -108,31 +108,47 @@ let disease="", medicine="", doseInfo="";
 let recognition, resetting=false, isSpeaking=false;
 
 /* ===== WORD SETS ===== */
-const feverWords=["ताप","ताप येत आहे","ताप आहे","अंग तापत आहे"];
-const headWords=["डोके","डोकेदुखी","डोक दुखत","डोक दुखतय"];
-const coldWords=["सर्दी","सर्दी झाली"];
-const coughWords=["खोकला","खोकल येत"];
-const stomachWords=["पोट","पोट दुखत","पोटात दुखत"];
+const feverWords=["ताप","अंग तापत","ताप येतोय"];
+const headWords=["डोके","डोकेदुखी","डोक दुखत"];
+const coldWords=["सर्दी"];
+const coughWords=["खोकला"];
+const stomachWords=["पोट","पोट दुखत"];
 
 /* ===== USB SERIAL ===== */
 let port, writer;
+
 async function initUSB(){
-  port = await navigator.serial.requestPort();
-  await port.open({ baudRate:9600 });
-  const encoder=new TextEncoderStream();
-  encoder.readable.pipeTo(port.writable);
-  writer=encoder.writable.getWriter();
-  out.innerHTML+="<br>🔌 <b>USB Connected to ESP32</b>";
+  try{
+    port = await navigator.serial.requestPort();
+    await port.open({ baudRate:9600 });
+
+    const encoder = new TextEncoderStream();
+    encoder.readable.pipeTo(port.writable);
+    writer = encoder.writable.getWriter();
+
+    out.innerHTML += "<br>🔌 <b>USB Connected to ESP32</b>";
+  }catch(e){
+    out.innerHTML += "<br>❌ USB Connection Failed";
+  }
 }
-function manualUSB(){ initUSB(); }
-function sendUSB(cmd){ if(writer) writer.write(cmd); }
+
+function manualUSB(){
+  initUSB();
+}
+
+function sendUSB(cmd){
+  if(writer){
+    writer.write(cmd);
+    out.innerHTML += "<br>📤 Command Sent : <b>"+cmd+"</b>";
+  }
+}
 
 /* ===== SPEAK ===== */
 function speak(text, reset=false){
   isSpeaking = true;
-  out.innerHTML+="<br>🤖 <b>"+text+"</b>";
+  out.innerHTML += "<br>🤖 <b>"+text+"</b>";
 
-  let msg=new SpeechSynthesisUtterance(text);
+  let msg = new SpeechSynthesisUtterance(text);
   msg.lang="mr-IN";
   msg.rate=0.7;
 
@@ -159,7 +175,7 @@ function startCountdown(sec){
   },1000);
 }
 
-/* ===== MIC + BEEP FIX ===== */
+/* ===== BEEP + MIC ===== */
 function beepAndListen(){
   let b=document.getElementById("beep");
   b.play();
@@ -174,34 +190,32 @@ function startListening(){
   recognition.start();
 
   recognition.onresult=e=>{
-    let text=e.results[0][0].transcript.trim().toLowerCase();
-    if(text.length<2) return;
-
+    let text=e.results[0][0].transcript.toLowerCase();
     out.innerHTML+="<br>🗣️ "+text;
 
     if(step===0){
       if(feverWords.some(w=>text.includes(w))){
         disease="ताप"; medicine="पॅरासिटामॉल";
-        doseInfo="६ ते ८ तासांनी, दिवसातून ३ वेळा, सकाळी दुपारी संध्याकाळी जेवणानंतर घ्या.";
+        doseInfo="६ ते ८ तासांनी घ्या.";
       }
       else if(headWords.some(w=>text.includes(w))){
         disease="डोकेदुखी"; medicine="पेनकिलर";
-        doseInfo="दिवसातून २ वेळा, सकाळी आणि संध्याकाळी जेवणानंतर घ्या.";
+        doseInfo="दिवसातून २ वेळा जेवणानंतर.";
       }
       else if(coldWords.some(w=>text.includes(w))){
         disease="सर्दी"; medicine="कोल्ड टॅब्लेट";
-        doseInfo="दिवसातून २ वेळा, सकाळी आणि संध्याकाळी जेवणानंतर घ्या.";
+        doseInfo="दिवसातून २ वेळा.";
       }
       else if(coughWords.some(w=>text.includes(w))){
         disease="खोकला"; medicine="खोकल्याची गोळी";
-        doseInfo="दिवसातून २ ते ३ वेळा, सकाळी दुपारी संध्याकाळी जेवणानंतर घ्या.";
+        doseInfo="दिवसातून २ ते ३ वेळा.";
       }
       else if(stomachWords.some(w=>text.includes(w))){
         disease="पोटदुखी"; medicine="अँटॅसिड";
-        doseInfo="दिवसातून २ वेळा, सकाळी आणि संध्याकाळी जेवणानंतर घ्या.";
+        doseInfo="दिवसातून २ वेळा.";
       }
       else{
-        speak("कृपया डॉक्टरांचा सल्ला घ्या.",true);
+        speak("कृपया डॉक्टरांचा सल्ला घ्या.", true);
         return;
       }
 
@@ -223,27 +237,19 @@ function startListening(){
 
         speak(
           "औषध आहे "+medicine+
-          ". हे औषध कधी आणि कसं घ्यायचं ते नीट ऐका. "+
-          doseInfo+
-          ". जर हे औषध घेऊनही फरक पडला नाही, तर चांगल्या डॉक्टरांचा सल्ला घ्या. "+
-          "स्वतःची काळजी घ्या. धन्यवाद.",
+          ". डोस असा आहे. "+doseInfo+
+          ". फरक न पडल्यास डॉक्टरांचा सल्ला घ्या.",
           true
         );
-      } else {
+      }else{
         speak("ठीक आहे.", true);
       }
       step=0;
     }
   };
-
-  recognition.onend=()=>{
-    if(step===0 && !resetting && !isSpeaking){
-      setTimeout(()=>startListening(),800);
-    }
-  };
 }
 
-/* ===== START ===== */
+/* ===== START CAMERA ===== */
 navigator.mediaDevices.getUserMedia({video:true})
 .then(s=>{
   cam.srcObject=s;
