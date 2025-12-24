@@ -188,7 +188,7 @@ function startListening(){
 
       if(feverWords.some(w=>text.includes(w))){
         disease="ताप"; medicine="पॅरासिटामॉल";
-        doseInfo="६ ते ८ तासांनी, दिवसातून ३ वेळा जेवणानंतर घ्या.";
+        doseInfo="दिवसातून ३ वेळा जेवणानंतर घ्या.";
       }
       else if(headWords.some(w=>text.includes(w))){
         disease="डोकेदुखी"; medicine="पेनकिलर";
@@ -199,7 +199,7 @@ function startListening(){
         doseInfo="दिवसातून २ वेळा.";
       }
       else if(coughWords.some(w=>text.includes(w))){
-        disease="खोकला"; medicine="खोकल्याची गोळी";
+        disease="खोकला"; medicine=" कफ टॅब्लेट";
         doseInfo="दिवसातून २ ते ३ वेळा.";
       }
       else if(stomachWords.some(w=>text.includes(w))){
@@ -231,7 +231,7 @@ function startListening(){
         speak(
           "औषध "+medicine+" आहे. डोस असा आहे. "+
           doseInfo+
-          " फरक न पडल्यास डॉक्टरांचा सल्ला घ्या.",
+          " फरक न पडल्यास योग्य डॉक्टरांचा सल्ला घ्या.",
           true
         );
       }else{
